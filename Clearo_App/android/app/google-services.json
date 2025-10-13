@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "400489519426",
+    "project_id": "clearo-73407",
+    "storage_bucket": "clearo-73407.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:400489519426:android:a5d1d8692c2b0366cb10db",
+        "android_client_info": {
+          "package_name": "com.example.clearo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB10Un-rz2kLakGCXwBpYdfCKB4I8WCxS8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
