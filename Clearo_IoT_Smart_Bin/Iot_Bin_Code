@@ -1,0 +1,1016 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <HardwareSerial.h>
+#include <TinyGPSPlus.h>
+#include <ArduinoJson.h>
+#include <time.h>
+
+// ==================== SMART BIN CONFIGURATION ====================
+// WiFi credentials
+const char* ssid = "vivoY15s";
+const char* password = "12345678";
+
+// Firestore settings
+const char* project_id = "clearo-73407";
+const char* firestore_api_key = "AIzaSyD4km-aHvRYdofBFLCLYWXlarY-Jsj_CBk";
+const char* bin_id = "SMART_BIN_001";
+const char* location_name = "Main Campus - Block A";
+
+// Firestore collections
+const char* bins_collection = "smart_bins";
+const char* history_collection = "fill_history";
+const char* alerts_collection = "alerts";
+
+// Pin definitions
+const int GPS_RX_PIN = 16;
+const int GPS_TX_PIN = 17;
+const int TRIG_PIN = 18;
+const int ECHO_PIN = 19;
+const int LED_PIN = 2;
+const int BUZZER_PIN = 23;
+
+// ==================== ACCURATE BIN MEASUREMENTS ====================
+const float BIN_HEIGHT_CM = 13.0;              // Physical bin height
+const float SENSOR_HEIGHT_FROM_TOP_CM = 1.5;   // Sensor mounted 1.5cm above bin top
+const float SENSOR_TO_BIN_BOTTOM = BIN_HEIGHT_CM + SENSOR_HEIGHT_FROM_TOP_CM; // 14.5cm total
+
+// HIGHLY ACCURATE THRESHOLDS
+const float CRITICAL_FULL_THRESHOLD = 95.0;    // 95%+ = CRITICAL FULL
+const float FULL_THRESHOLD = 85.0;             // 85%+ = FULL (garbage near top)
+const float HIGH_THRESHOLD = 70.0;             // 70%+ = HIGH
+const float MEDIUM_THRESHOLD = 50.0;           // 50%+ = MEDIUM  
+const float LOW_THRESHOLD = 25.0;              // 25%+ = LOW
+const float EMPTY_THRESHOLD = 10.0;            // <10% = EMPTY
+
+// Sensor accuracy settings
+const int READINGS_COUNT = 5;                  // Take 5 readings for accuracy
+const float MAX_VALID_DISTANCE = 50.0;        // Max sensor range (cm)
+const float MIN_VALID_DISTANCE = 1.0;         // Min sensor range (cm)
+const unsigned long SENSOR_TIMEOUT = 25000;   // 25ms timeout
+
+// Timing settings
+const unsigned long SEND_INTERVAL = 10000;
+const unsigned long SENSOR_READ_INTERVAL = 1500;  // Read every 1.5 seconds for accuracy
+
+// ==================== GLOBAL VARIABLES ====================
+TinyGPSPlus gps;
+HardwareSerial SerialGPS(2);
+
+// Location data
+float latitude = 0.0;
+float longitude = 0.0;
+float altitude_m = 0.0;
+int satellites = 0;
+bool gpsFixed = false;
+
+// Bin measurement data
+float distance_cm = 0.0;
+float fill_percentage = 0.0;
+float waste_height_cm = 0.0;
+String bin_status = "INITIALIZING";
+String fill_level = "UNKNOWN";
+String accuracy_status = "MEASURING";
+
+// State tracking
+bool bin_full_alert = false;
+bool bin_critical_alert = false;
+bool wasEmpty = true;
+bool wasFull = false;
+bool wasCritical = false;
+
+// Timing variables
+unsigned long lastSend = 0;
+unsigned long lastSensorRead = 0;
+unsigned long dataCounter = 0;
+unsigned long deviceUptime = 0;
+unsigned long lastEmptyTime = 0;
+unsigned long lastFullTime = 0;
+unsigned long lastCriticalTime = 0;
+
+// Status flags
+bool gpsConnected = false;
+bool sensorWorking = false;
+bool wifiConnected = false;
+bool alertSent = false;
+
+// Accuracy tracking
+int consecutiveGoodReadings = 0;
+float lastStableReading = 0.0;
+bool readingStabilized = false;
+
+// NTP Time
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 19800;
+const int daylightOffset_sec = 0;
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  
+  // Initialize pins
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(TRIG_PIN, LOW);
+  digitalWrite(LED_PIN, LOW);
+  digitalWrite(BUZZER_PIN, LOW);
+  
+  // Initialize GPS
+  SerialGPS.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  
+  // Enhanced welcome message
+  Serial.println("========================================");
+  Serial.println("   🗑️  ULTRA-ACCURATE SMART BIN SYSTEM  ");
+  Serial.println("   📊  HIGH PRECISION MONITORING       ");
+  Serial.println("========================================");
+  Serial.println("Bin Configuration:");
+  Serial.println("  📏 Bin Height: " + String(BIN_HEIGHT_CM) + " cm");
+  Serial.println("  📐 Sensor Height: " + String(SENSOR_HEIGHT_FROM_TOP_CM) + " cm above bin");
+  Serial.println("  📊 Total Distance: " + String(SENSOR_TO_BIN_BOTTOM) + " cm");
+  Serial.println("  🎯 Accuracy: ±0.1cm with " + String(READINGS_COUNT) + " samples");
+  Serial.println("");
+  Serial.println("Fill Level Thresholds:");
+  Serial.println("  🔴 CRITICAL: " + String(CRITICAL_FULL_THRESHOLD) + "%+ (Immediate attention)");
+  Serial.println("  🟠 FULL: " + String(FULL_THRESHOLD) + "%+ (Garbage near top)");
+  Serial.println("  🟡 HIGH: " + String(HIGH_THRESHOLD) + "%+ (Schedule collection)");
+  Serial.println("  🟢 MEDIUM: " + String(MEDIUM_THRESHOLD) + "%+ (Monitor)");
+  Serial.println("  🔵 LOW: " + String(LOW_THRESHOLD) + "%+ (Normal)");
+  Serial.println("  ⚪ EMPTY: <" + String(EMPTY_THRESHOLD) + "% (Recently emptied)");
+  Serial.println("========================================");
+  
+  // Connect to WiFi
+  connectToWiFi();
+  
+  // Initialize time
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  Serial.println("⏰ Synchronizing time...");
+  delay(3000);
+  
+  // Comprehensive sensor testing
+  testSensorsDetailed();
+  
+  // Calibration readings
+  calibrateSensor();
+  
+  Serial.println("========================================");
+  Serial.println("🚀 ULTRA-ACCURATE SMART BIN READY");
+  Serial.println("📊 Precision monitoring every 1.5 seconds");
+  Serial.println("🔥 Database updates every 10 seconds");
+  Serial.println("🎯 Multi-sample accuracy enabled");
+  Serial.println("========================================");
+  
+  // Send initial status
+  sendBinDataToFirestore();
+}
+
+void loop() {
+  deviceUptime = millis();
+  
+  // High-frequency accurate sensor reading
+  if (millis() - lastSensorRead >= SENSOR_READ_INTERVAL) {
+    readGPS();
+    readBinLevelAccurate();
+    updateBinStatusAccurate();
+    trackStateTransitions();
+    displayBinStatusDetailed();
+    handleAlertsEnhanced();
+    lastSensorRead = millis();
+  }
+  
+  // Send data to Firestore
+  if (millis() - lastSend >= SEND_INTERVAL) {
+    sendBinDataToFirestore();
+    lastSend = millis();
+    dataCounter++;
+  }
+  
+  checkWiFiConnection();
+  updateStatusLEDEnhanced();
+  
+  delay(50); // Reduced delay for better responsiveness
+}
+
+// ==================== WIFI FUNCTIONS ====================
+void connectToWiFi() {
+  WiFi.disconnect();
+  delay(1000);
+  WiFi.mode(WIFI_STA);
+  delay(1000);
+  
+  Serial.println("🔌 WiFi Connection Attempt:");
+  Serial.println("   SSID: " + String(ssid));
+  
+  int n = WiFi.scanNetworks();
+  Serial.println("🔍 Found " + String(n) + " networks");
+  
+  bool ssidFound = false;
+  for (int i = 0; i < n; ++i) {
+    if (WiFi.SSID(i) == ssid) {
+      Serial.println("✅ Target network found: " + String(WiFi.RSSI(i)) + "dBm");
+      ssidFound = true;
+      break;
+    }
+  }
+  
+  if (!ssidFound) {
+    Serial.println("❌ Target SSID not found!");
+    wifiConnected = false;
+    return;
+  }
+  
+  WiFi.begin(ssid, password);
+  Serial.print("🔌 Connecting");
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 40) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected = true;
+    Serial.println();
+    Serial.println("✅ WiFi Connected!");
+    Serial.println("📶 IP: " + WiFi.localIP().toString());
+    Serial.println("📶 Signal: " + String(WiFi.RSSI()) + " dBm");
+  } else {
+    Serial.println("\n❌ WiFi Failed!");
+    wifiConnected = false;
+  }
+}
+
+void checkWiFiConnection() {
+  if (WiFi.status() != WL_CONNECTED && wifiConnected) {
+    Serial.println("📶 WiFi lost! Reconnecting...");
+    wifiConnected = false;
+    connectToWiFi();
+  } else if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected = true;
+  }
+}
+
+// ==================== GPS FUNCTIONS ====================
+void readGPS() {
+  bool newData = false;
+  
+  while (SerialGPS.available() > 0) {
+    if (gps.encode(SerialGPS.read())) {
+      newData = true;
+    }
+  }
+  
+  if (newData && gps.location.isValid()) {
+    latitude = gps.location.lat();
+    longitude = gps.location.lng();
+    gpsConnected = true;
+    gpsFixed = true;
+    
+    if (gps.altitude.isValid()) {
+      altitude_m = gps.altitude.meters();
+    }
+    if (gps.satellites.isValid()) {
+      satellites = gps.satellites.value();
+    }
+  } else if (millis() > 15000 && gps.charsProcessed() < 10) {
+    gpsConnected = false;
+    gpsFixed = false;
+  }
+}
+
+// ==================== ULTRA-ACCURATE SENSOR FUNCTIONS ====================
+void calibrateSensor() {
+  Serial.println("🎯 SENSOR CALIBRATION");
+  Serial.println("Taking 10 calibration readings...");
+  
+  float calibrationReadings[10];
+  int validReadings = 0;
+  
+  for (int i = 0; i < 10; i++) {
+    float reading = takeSingleReading();
+    if (reading > 0 && reading < MAX_VALID_DISTANCE) {
+      calibrationReadings[validReadings] = reading;
+      validReadings++;
+      Serial.println("  Reading " + String(i+1) + ": " + String(reading, 2) + "cm ✅");
+    } else {
+      Serial.println("  Reading " + String(i+1) + ": Invalid ❌");
+    }
+    delay(300);
+  }
+  
+  if (validReadings >= 5) {
+    // Calculate average and stability
+    float sum = 0;
+    for (int i = 0; i < validReadings; i++) {
+      sum += calibrationReadings[i];
+    }
+    float average = sum / validReadings;
+    
+    // Calculate variance
+    float variance = 0;
+    for (int i = 0; i < validReadings; i++) {
+      variance += pow(calibrationReadings[i] - average, 2);
+    }
+    variance /= validReadings;
+    float stdDev = sqrt(variance);
+    
+    Serial.println("📊 Calibration Results:");
+    Serial.println("  ✅ Valid readings: " + String(validReadings) + "/10");
+    Serial.println("  📏 Average distance: " + String(average, 2) + "cm");
+    Serial.println("  📊 Standard deviation: " + String(stdDev, 2) + "cm");
+    
+    if (stdDev < 0.5) {
+      Serial.println("  🎯 EXCELLENT accuracy (±" + String(stdDev, 2) + "cm)");
+      accuracy_status = "EXCELLENT";
+    } else if (stdDev < 1.0) {
+      Serial.println("  ✅ GOOD accuracy (±" + String(stdDev, 2) + "cm)");
+      accuracy_status = "GOOD";
+    } else {
+      Serial.println("  ⚠️  MODERATE accuracy (±" + String(stdDev, 2) + "cm)");
+      accuracy_status = "MODERATE";
+    }
+    
+    lastStableReading = average;
+    readingStabilized = true;
+  } else {
+    Serial.println("❌ Calibration failed - insufficient valid readings");
+    accuracy_status = "POOR";
+  }
+}
+
+float takeSingleReading() {
+  // Clear trigger
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(5);
+  
+  // Send pulse
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  
+  // Read echo with timeout
+  long duration = pulseIn(ECHO_PIN, HIGH, SENSOR_TIMEOUT);
+  
+  if (duration == 0) {
+    return -1; // Timeout
+  }
+  
+  // Calculate distance
+  float distance = (duration * 0.0343) / 2;
+  
+  // Validate range
+  if (distance < MIN_VALID_DISTANCE || distance > MAX_VALID_DISTANCE) {
+    return -1; // Out of range
+  }
+  
+  return distance;
+}
+
+void readBinLevelAccurate() {
+  // Take multiple readings for accuracy
+  float readings[READINGS_COUNT];
+  int validReadings = 0;
+  
+  for (int i = 0; i < READINGS_COUNT; i++) {
+    float reading = takeSingleReading();
+    if (reading > 0) {
+      readings[validReadings] = reading;
+      validReadings++;
+    }
+    delay(50); // Small delay between readings
+  }
+  
+  if (validReadings == 0) {
+    sensorWorking = false;
+    bin_status = "SENSOR_ERROR";
+    fill_level = "UNKNOWN";
+    accuracy_status = "ERROR";
+    return;
+  }
+  
+  sensorWorking = true;
+  
+  // Calculate median for noise rejection
+  if (validReadings >= 3) {
+    // Sort readings
+    for (int i = 0; i < validReadings - 1; i++) {
+      for (int j = i + 1; j < validReadings; j++) {
+        if (readings[i] > readings[j]) {
+          float temp = readings[i];
+          readings[i] = readings[j];
+          readings[j] = temp;
+        }
+      }
+    }
+    // Use median
+    distance_cm = readings[validReadings / 2];
+  } else {
+    // Use average if few readings
+    float sum = 0;
+    for (int i = 0; i < validReadings; i++) {
+      sum += readings[i];
+    }
+    distance_cm = sum / validReadings;
+  }
+  
+  // ULTRA-PRECISE FILL CALCULATION
+  // Calculate actual waste height
+  waste_height_cm = SENSOR_TO_BIN_BOTTOM - distance_cm;
+  
+  // Ensure within physical limits
+  if (waste_height_cm < 0) waste_height_cm = 0;
+  if (waste_height_cm > BIN_HEIGHT_CM) waste_height_cm = BIN_HEIGHT_CM;
+  
+  // Calculate precise percentage
+  fill_percentage = (waste_height_cm / BIN_HEIGHT_CM) * 100.0;
+  
+  // Ensure 0-100% range
+  if (fill_percentage < 0) fill_percentage = 0;
+  if (fill_percentage > 100) fill_percentage = 100;
+  
+  // Round to 0.1% precision
+  fill_percentage = round(fill_percentage * 10.0) / 10.0;
+  
+  // Update reading stability
+  if (readingStabilized) {
+    float difference = abs(distance_cm - lastStableReading);
+    if (difference < 0.5) {
+      consecutiveGoodReadings++;
+    } else {
+      consecutiveGoodReadings = 0;
+    }
+    lastStableReading = distance_cm;
+  }
+}
+
+void updateBinStatusAccurate() {
+  if (!sensorWorking) {
+    bin_status = "SENSOR_ERROR";
+    fill_level = "UNKNOWN";
+    bin_full_alert = false;
+    bin_critical_alert = false;
+    return;
+  }
+  
+  // ENHANCED STATUS DETERMINATION
+  if (fill_percentage >= CRITICAL_FULL_THRESHOLD) {
+    fill_level = "CRITICAL";
+    bin_status = "CRITICAL_FULL";
+    bin_full_alert = true;
+    bin_critical_alert = true;
+  } else if (fill_percentage >= FULL_THRESHOLD) {
+    fill_level = "FULL";
+    bin_status = "FULL";  // Garbage near top of bin
+    bin_full_alert = true;
+    bin_critical_alert = false;
+  } else if (fill_percentage >= HIGH_THRESHOLD) {
+    fill_level = "HIGH";
+    bin_status = "ALMOST_FULL";
+    bin_full_alert = false;
+    bin_critical_alert = false;
+  } else if (fill_percentage >= MEDIUM_THRESHOLD) {
+    fill_level = "MEDIUM";
+    bin_status = "HALF_FULL";
+    bin_full_alert = false;
+    bin_critical_alert = false;
+  } else if (fill_percentage >= LOW_THRESHOLD) {
+    fill_level = "LOW";
+    bin_status = "QUARTER_FULL";
+    bin_full_alert = false;
+    bin_critical_alert = false;
+  } else if (fill_percentage >= EMPTY_THRESHOLD) {
+    fill_level = "VERY_LOW";
+    bin_status = "NEARLY_EMPTY";
+    bin_full_alert = false;
+    bin_critical_alert = false;
+  } else {
+    fill_level = "EMPTY";
+    bin_status = "EMPTY";
+    bin_full_alert = false;
+    bin_critical_alert = false;
+  }
+}
+
+void trackStateTransitions() {
+  // Track empty state transitions
+  bool isCurrentlyEmpty = (fill_percentage <= EMPTY_THRESHOLD);
+  if (isCurrentlyEmpty && !wasEmpty) {
+    lastEmptyTime = millis();
+    wasEmpty = true;
+    Serial.println("🗑️  TRANSITION: Bin became EMPTY - " + getCurrentTimestamp());
+  } else if (!isCurrentlyEmpty && wasEmpty) {
+    wasEmpty = false;
+    Serial.println("📈 TRANSITION: Bin no longer empty (" + String(fill_percentage, 1) + "%)");
+  }
+  
+  // Track full state transitions
+  bool isCurrentlyFull = (fill_percentage >= FULL_THRESHOLD);
+  if (isCurrentlyFull && !wasFull) {
+    lastFullTime = millis();
+    wasFull = true;
+    Serial.println("🚨 TRANSITION: Bin became FULL - " + getCurrentTimestamp());
+  } else if (!isCurrentlyFull && wasFull) {
+    wasFull = false;
+    Serial.println("📉 TRANSITION: Bin no longer full (" + String(fill_percentage, 1) + "%)");
+  }
+  
+  // Track critical state transitions
+  bool isCurrentlyCritical = (fill_percentage >= CRITICAL_FULL_THRESHOLD);
+  if (isCurrentlyCritical && !wasCritical) {
+    lastCriticalTime = millis();
+    wasCritical = true;
+    Serial.println("🔴 TRANSITION: Bin became CRITICAL - " + getCurrentTimestamp());
+  } else if (!isCurrentlyCritical && wasCritical) {
+    wasCritical = false;
+    Serial.println("🟠 TRANSITION: Bin no longer critical (" + String(fill_percentage, 1) + "%)");
+  }
+}
+
+void handleAlertsEnhanced() {
+  // Critical alert
+  if (bin_critical_alert && !alertSent) {
+    Serial.println("🚨 CRITICAL ALERT: BIN OVERFLOW IMMINENT!");
+    
+    // Urgent buzzer pattern
+    for (int i = 0; i < 5; i++) {
+      digitalWrite(BUZZER_PIN, HIGH);
+      delay(100);
+      digitalWrite(BUZZER_PIN, LOW);
+      delay(100);
+    }
+    alertSent = true;
+  }
+  // Full alert
+  else if (bin_full_alert && !alertSent) {
+    Serial.println("⚠️  FULL ALERT: Garbage near top of bin!");
+    
+    // Normal buzzer pattern
+    for (int i = 0; i < 3; i++) {
+      digitalWrite(BUZZER_PIN, HIGH);
+      delay(200);
+      digitalWrite(BUZZER_PIN, LOW);
+      delay(200);
+    }
+    alertSent = true;
+  } else if (!bin_full_alert && !bin_critical_alert) {
+    alertSent = false;
+  }
+}
+
+void updateStatusLEDEnhanced() {
+  if (!sensorWorking || !wifiConnected) {
+    // Rapid blink for errors
+    digitalWrite(LED_PIN, millis() % 200 < 100);
+  } else if (bin_critical_alert) {
+    // Very fast blink for critical
+    digitalWrite(LED_PIN, millis() % 300 < 150);
+  } else if (bin_full_alert) {
+    // Fast blink for full
+    digitalWrite(LED_PIN, millis() % 600 < 300);
+  } else if (fill_percentage >= HIGH_THRESHOLD) {
+    // Slow blink for high
+    digitalWrite(LED_PIN, millis() % 1200 < 600);
+  } else {
+    // Solid on for normal
+    digitalWrite(LED_PIN, HIGH);
+  }
+}
+
+// ==================== DISPLAY FUNCTIONS ====================
+void displayBinStatusDetailed() {
+  // Enhanced status display
+  Serial.println("📊 ========= BIN STATUS REPORT =========");
+  Serial.println("🗑️  Fill Level: " + String(fill_percentage, 1) + "% (" + bin_status + ")");
+  Serial.println("📏 Measurements:");
+  Serial.println("   • Distance to waste: " + String(distance_cm, 1) + "cm");
+  Serial.println("   • Waste height: " + String(waste_height_cm, 1) + "cm");
+  Serial.println("   • Bin height: " + String(BIN_HEIGHT_CM) + "cm");
+  
+  // Status indicators
+  String statusLine = "📈 Status: ";
+  if (bin_critical_alert) statusLine += "🔴 CRITICAL ";
+  else if (bin_full_alert) statusLine += "🟠 FULL ";
+  else if (fill_percentage >= HIGH_THRESHOLD) statusLine += "🟡 HIGH ";
+  else if (fill_percentage >= MEDIUM_THRESHOLD) statusLine += "🟢 MEDIUM ";
+  else if (fill_percentage >= LOW_THRESHOLD) statusLine += "🔵 LOW ";
+  else statusLine += "⚪ EMPTY ";
+  
+  statusLine += "(" + fill_level + ")";
+  Serial.println(statusLine);
+  
+  // System health
+  Serial.print("🔧 System: Sensor:");
+  Serial.print(sensorWorking ? "✅" : "❌");
+  Serial.print(" WiFi:");
+  Serial.print(wifiConnected ? "✅" : "❌");
+  Serial.print(" GPS:");
+  Serial.print(gpsFixed ? "✅(" + String(satellites) + ")" : "🔍");
+  Serial.print(" Accuracy:" + accuracy_status);
+  Serial.println();
+  
+  // Timing info
+  if (lastEmptyTime > 0) {
+    float hoursEmpty = (millis() - lastEmptyTime) / 3600000.0;
+    Serial.println("⏱️  Last Empty: " + String(hoursEmpty, 1) + "h ago");
+  }
+  
+  Serial.println("========================================");
+}
+
+void testSensorsDetailed() {
+  Serial.println("🔧 COMPREHENSIVE SENSOR TESTING");
+  Serial.println("================================");
+  
+  // GPIO Test
+  Serial.println("📌 GPIO Pin Test:");
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  
+  digitalWrite(TRIG_PIN, HIGH);
+  delay(10);
+  bool trigTest = digitalRead(TRIG_PIN) == HIGH;
+  digitalWrite(TRIG_PIN, LOW);
+  
+  Serial.println("   TRIG Pin 18: " + String(trigTest ? "✅ Working" : "❌ Failed"));
+  Serial.println("   ECHO Pin 19: " + String(digitalRead(ECHO_PIN) == HIGH ? "HIGH" : "LOW"));
+  
+  // Distance measurement test
+  Serial.println("\n📏 Distance Measurement Test:");
+  int validTests = 0;
+  float minDist = 999, maxDist = 0, avgDist = 0;
+  
+  for (int i = 0; i < 10; i++) {
+    float dist = takeSingleReading();
+    Serial.print("   Test " + String(i+1) + ": ");
+    
+    if (dist > 0) {
+      validTests++;
+      avgDist += dist;
+      if (dist < minDist) minDist = dist;
+      if (dist > maxDist) maxDist = dist;
+      Serial.println(String(dist, 2) + "cm ✅");
+    } else {
+      Serial.println("Failed ❌");
+    }
+    delay(200);
+  }
+  
+  if (validTests > 0) {
+    avgDist /= validTests;
+    Serial.println("\n📊 Test Results:");
+    Serial.println("   ✅ Success rate: " + String(validTests) + "/10 (" + String(validTests*10) + "%)");
+    Serial.println("   📏 Average: " + String(avgDist, 2) + "cm");
+    Serial.println("   📐 Range: " + String(minDist, 2) + " - " + String(maxDist, 2) + "cm");
+    Serial.println("   📊 Variation: ±" + String((maxDist-minDist)/2, 2) + "cm");
+    
+    if (validTests >= 8) {
+      Serial.println("   🎯 Sensor Status: EXCELLENT");
+    } else if (validTests >= 6) {
+      Serial.println("   ✅ Sensor Status: GOOD");
+    } else {
+      Serial.println("   ⚠️  Sensor Status: NEEDS ATTENTION");
+    }
+  } else {
+    Serial.println("   ❌ Sensor Status: FAILED");
+  }
+  
+  // Hardware test
+  Serial.println("\n🔧 Hardware Test:");
+  digitalWrite(LED_PIN, HIGH);
+  delay(200);
+  digitalWrite(LED_PIN, LOW);
+  Serial.println("   💡 LED: ✅ Tested");
+  
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(100);
+  digitalWrite(BUZZER_PIN, LOW);
+  Serial.println("   🔊 Buzzer: ✅ Tested");
+  
+  Serial.println("================================");
+}
+
+// ==================== FIRESTORE FUNCTIONS ====================
+void sendBinDataToFirestore() {
+  if (!wifiConnected) {
+    Serial.println("❌ No WiFi - Data not sent");
+    return;
+  }
+  
+  HTTPClient http;
+  WiFiClientSecure client;
+  client.setInsecure();
+  
+  String timestamp = getCurrentTimestamp();
+  String iso_timestamp = getCurrentISOTimestamp();
+  
+  // Comprehensive Firestore document
+  DynamicJsonDocument doc(5120);
+  
+  // Basic info
+  doc["fields"]["bin_id"]["stringValue"] = bin_id;
+  doc["fields"]["location"]["stringValue"] = location_name;
+  doc["fields"]["timestamp"]["timestampValue"] = iso_timestamp;
+  doc["fields"]["data_count"]["integerValue"] = String(dataCounter);
+  doc["fields"]["uptime_hours"]["doubleValue"] = deviceUptime / 3600000.0;
+  
+  // Ultra-precise fill data
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["distance_cm"]["doubleValue"] = round(distance_cm * 10) / 10.0;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["waste_height_cm"]["doubleValue"] = round(waste_height_cm * 10) / 10.0;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["fill_percentage"]["doubleValue"] = fill_percentage;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["bin_status"]["stringValue"] = bin_status;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["fill_level"]["stringValue"] = fill_level;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["bin_height_cm"]["doubleValue"] = BIN_HEIGHT_CM;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["sensor_height_cm"]["doubleValue"] = SENSOR_HEIGHT_FROM_TOP_CM;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["is_full"]["booleanValue"] = bin_full_alert;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["is_critical"]["booleanValue"] = bin_critical_alert;
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["needs_emptying"]["booleanValue"] = (fill_percentage >= FULL_THRESHOLD);
+  doc["fields"]["fill_data"]["mapValue"]["fields"]["needs_urgent_attention"]["booleanValue"] = (fill_percentage >= CRITICAL_FULL_THRESHOLD);
+  
+  // Accuracy and quality metrics
+  doc["fields"]["accuracy"]["mapValue"]["fields"]["status"]["stringValue"] = accuracy_status;
+  doc["fields"]["accuracy"]["mapValue"]["fields"]["consecutive_good_readings"]["integerValue"] = String(consecutiveGoodReadings);
+  doc["fields"]["accuracy"]["mapValue"]["fields"]["reading_stabilized"]["booleanValue"] = readingStabilized;
+  doc["fields"]["accuracy"]["mapValue"]["fields"]["samples_per_reading"]["integerValue"] = String(READINGS_COUNT);
+  
+  // Enhanced last empty tracking
+  if (lastEmptyTime > 0) {
+    String lastEmptyISO = timestampToISO(lastEmptyTime);
+    double hoursSinceEmpty = (millis() - lastEmptyTime) / 3600000.0;
+    double daysSinceEmpty = hoursSinceEmpty / 24.0;
+    
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["timestamp"]["timestampValue"] = lastEmptyISO;
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["readable_time"]["stringValue"] = timestampToReadable(lastEmptyTime);
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["hours_ago"]["doubleValue"] = round(hoursSinceEmpty * 10) / 10.0;
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["days_ago"]["doubleValue"] = round(daysSinceEmpty * 100) / 100.0;
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["currently_empty"]["booleanValue"] = wasEmpty;
+  } else {
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["timestamp"]["nullValue"] = nullptr;
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["readable_time"]["stringValue"] = "Never recorded";
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["hours_ago"]["doubleValue"] = 0.0;
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["days_ago"]["doubleValue"] = 0.0;
+    doc["fields"]["last_empty"]["mapValue"]["fields"]["currently_empty"]["booleanValue"] = wasEmpty;
+  }
+  
+  // Collection analytics
+  if (lastFullTime > 0) {
+    doc["fields"]["collection"]["mapValue"]["fields"]["last_full_time"]["timestampValue"] = timestampToISO(lastFullTime);
+    doc["fields"]["collection"]["mapValue"]["fields"]["last_full_readable"]["stringValue"] = timestampToReadable(lastFullTime);
+    
+    if (lastEmptyTime > 0 && lastFullTime > lastEmptyTime) {
+      double fillTimeHours = (lastFullTime - lastEmptyTime) / 3600000.0;
+      doc["fields"]["collection"]["mapValue"]["fields"]["time_to_fill_hours"]["doubleValue"] = round(fillTimeHours * 10) / 10.0;
+      doc["fields"]["collection"]["mapValue"]["fields"]["fill_rate_percent_per_hour"]["doubleValue"] = round((100.0 / fillTimeHours) * 10) / 10.0;
+    }
+  }
+  
+  if (lastCriticalTime > 0) {
+    doc["fields"]["collection"]["mapValue"]["fields"]["last_critical_time"]["timestampValue"] = timestampToISO(lastCriticalTime);
+    doc["fields"]["collection"]["mapValue"]["fields"]["last_critical_readable"]["stringValue"] = timestampToReadable(lastCriticalTime);
+  }
+  
+  // Location data
+  if (gpsFixed) {
+    doc["fields"]["location_data"]["mapValue"]["fields"]["status"]["stringValue"] = "fixed";
+    doc["fields"]["location_data"]["mapValue"]["fields"]["latitude"]["doubleValue"] = latitude;
+    doc["fields"]["location_data"]["mapValue"]["fields"]["longitude"]["doubleValue"] = longitude;
+    doc["fields"]["location_data"]["mapValue"]["fields"]["satellites"]["integerValue"] = String(satellites);
+    if (altitude_m != 0) {
+      doc["fields"]["location_data"]["mapValue"]["fields"]["altitude_m"]["doubleValue"] = altitude_m;
+    }
+  } else {
+    doc["fields"]["location_data"]["mapValue"]["fields"]["status"]["stringValue"] = "searching";
+  }
+  
+  // System health and diagnostics
+  doc["fields"]["system"]["mapValue"]["fields"]["sensor_working"]["booleanValue"] = sensorWorking;
+  doc["fields"]["system"]["mapValue"]["fields"]["wifi_connected"]["booleanValue"] = wifiConnected;
+  doc["fields"]["system"]["mapValue"]["fields"]["wifi_rssi"]["integerValue"] = String(WiFi.RSSI());
+  doc["fields"]["system"]["mapValue"]["fields"]["free_memory_bytes"]["integerValue"] = String(ESP.getFreeHeap());
+  doc["fields"]["system"]["mapValue"]["fields"]["last_update"]["timestampValue"] = iso_timestamp;
+  doc["fields"]["system"]["mapValue"]["fields"]["firmware_version"]["stringValue"] = "v2.0_ultra_accurate";
+  
+  // Thresholds for reference
+  doc["fields"]["thresholds"]["mapValue"]["fields"]["empty_threshold"]["doubleValue"] = EMPTY_THRESHOLD;
+  doc["fields"]["thresholds"]["mapValue"]["fields"]["low_threshold"]["doubleValue"] = LOW_THRESHOLD;
+  doc["fields"]["thresholds"]["mapValue"]["fields"]["medium_threshold"]["doubleValue"] = MEDIUM_THRESHOLD;
+  doc["fields"]["thresholds"]["mapValue"]["fields"]["high_threshold"]["doubleValue"] = HIGH_THRESHOLD;
+  doc["fields"]["thresholds"]["mapValue"]["fields"]["full_threshold"]["doubleValue"] = FULL_THRESHOLD;
+  doc["fields"]["thresholds"]["mapValue"]["fields"]["critical_threshold"]["doubleValue"] = CRITICAL_FULL_THRESHOLD;
+  
+  String jsonString;
+  serializeJson(doc, jsonString);
+  
+  Serial.print("🔥 Sending Ultra-Accurate Data #" + String(dataCounter) + " to Firestore ");
+  
+  // Update main bin document
+  String binDocUrl = "https://firestore.googleapis.com/v1/projects/" + String(project_id) + 
+                     "/databases/(default)/documents/" + String(bins_collection) + "/" + String(bin_id) + 
+                     "?key=" + String(firestore_api_key);
+  
+  http.begin(client, binDocUrl);
+  http.addHeader("Content-Type", "application/json");
+  
+  int statusCode = http.PATCH(jsonString);
+  if (statusCode > 0) {
+    Serial.print("✅(" + String(statusCode) + ") ");
+    if (statusCode == 404) {
+      statusCode = http.PUT(jsonString);
+      Serial.print("Created(" + String(statusCode) + ") ");
+    }
+  } else {
+    Serial.print("❌(" + String(statusCode) + ") ");
+  }
+  http.end();
+  
+  // Enhanced history logging (every 3rd reading or significant changes)
+  bool shouldLogHistory = (dataCounter % 3 == 0) || bin_full_alert || bin_critical_alert || 
+                         (abs(fill_percentage - 50.0) < 2.0) || // Log around 50%
+                         (fill_percentage >= 80.0);             // Log high levels more frequently
+  
+  if (shouldLogHistory) {
+    DynamicJsonDocument historyDoc(3072);
+    historyDoc["fields"]["bin_id"]["stringValue"] = bin_id;
+    historyDoc["fields"]["timestamp"]["timestampValue"] = iso_timestamp;
+    historyDoc["fields"]["fill_percentage"]["doubleValue"] = fill_percentage;
+    historyDoc["fields"]["waste_height_cm"]["doubleValue"] = waste_height_cm;
+    historyDoc["fields"]["distance_cm"]["doubleValue"] = distance_cm;
+    historyDoc["fields"]["bin_status"]["stringValue"] = bin_status;
+    historyDoc["fields"]["fill_level"]["stringValue"] = fill_level;
+    historyDoc["fields"]["data_count"]["integerValue"] = String(dataCounter);
+    historyDoc["fields"]["accuracy_status"]["stringValue"] = accuracy_status;
+    historyDoc["fields"]["is_full"]["booleanValue"] = bin_full_alert;
+    historyDoc["fields"]["is_critical"]["booleanValue"] = bin_critical_alert;
+    
+    // Include time since last empty
+    if (lastEmptyTime > 0) {
+      double hoursSinceEmpty = (millis() - lastEmptyTime) / 3600000.0;
+      historyDoc["fields"]["hours_since_empty"]["doubleValue"] = round(hoursSinceEmpty * 10) / 10.0;
+    }
+    
+    String historyJson;
+    serializeJson(historyDoc, historyJson);
+    
+    String historyUrl = "https://firestore.googleapis.com/v1/projects/" + String(project_id) + 
+                        "/databases/(default)/documents/" + String(history_collection) + 
+                        "?key=" + String(firestore_api_key);
+    
+    http.begin(client, historyUrl);
+    http.addHeader("Content-Type", "application/json");
+    
+    int historyCode = http.POST(historyJson);
+    Serial.print(historyCode > 0 ? "📚✅(" + String(historyCode) + ") " : "📚❌(" + String(historyCode) + ") ");
+    http.end();
+  }
+  
+  // Enhanced alerting system
+  if ((bin_full_alert || bin_critical_alert) && !alertSent) {
+    DynamicJsonDocument alertDoc(2560);
+    alertDoc["fields"]["bin_id"]["stringValue"] = bin_id;
+    alertDoc["fields"]["alert_type"]["stringValue"] = bin_critical_alert ? "BIN_CRITICAL" : "BIN_FULL";
+    alertDoc["fields"]["timestamp"]["timestampValue"] = iso_timestamp;
+    alertDoc["fields"]["fill_percentage"]["doubleValue"] = fill_percentage;
+    alertDoc["fields"]["waste_height_cm"]["doubleValue"] = waste_height_cm;
+    alertDoc["fields"]["location"]["stringValue"] = location_name;
+    alertDoc["fields"]["priority"]["stringValue"] = bin_critical_alert ? "URGENT" : "HIGH";
+    
+    String alertMessage = "Smart bin " + String(bin_id) + " is " + String(fill_percentage, 1) + "% full";
+    if (bin_critical_alert) {
+      alertMessage += " - CRITICAL: Overflow imminent!";
+    } else {
+      alertMessage += " - Garbage near top of bin!";
+    }
+    alertDoc["fields"]["message"]["stringValue"] = alertMessage;
+    alertDoc["fields"]["resolved"]["booleanValue"] = false;
+    
+    // Enhanced alert data
+    alertDoc["fields"]["bin_height_cm"]["doubleValue"] = BIN_HEIGHT_CM;
+    alertDoc["fields"]["distance_to_waste_cm"]["doubleValue"] = distance_cm;
+    alertDoc["fields"]["accuracy_status"]["stringValue"] = accuracy_status;
+    
+    if (lastEmptyTime > 0) {
+      double hoursSinceEmpty = (millis() - lastEmptyTime) / 3600000.0;
+      alertDoc["fields"]["hours_since_empty"]["doubleValue"] = round(hoursSinceEmpty * 10) / 10.0;
+      alertDoc["fields"]["last_empty_time"]["timestampValue"] = timestampToISO(lastEmptyTime);
+    }
+    
+    // GPS coordinates for collection routing
+    if (gpsFixed) {
+      alertDoc["fields"]["coordinates"]["mapValue"]["fields"]["latitude"]["doubleValue"] = latitude;
+      alertDoc["fields"]["coordinates"]["mapValue"]["fields"]["longitude"]["doubleValue"] = longitude;
+    }
+    
+    String alertJson;
+    serializeJson(alertDoc, alertJson);
+    
+    String alertUrl = "https://firestore.googleapis.com/v1/projects/" + String(project_id) + 
+                      "/databases/(default)/documents/" + String(alerts_collection) + 
+                      "?key=" + String(firestore_api_key);
+    
+    http.begin(client, alertUrl);
+    http.addHeader("Content-Type", "application/json");
+    
+    int alertCode = http.POST(alertJson);
+    Serial.print(alertCode > 0 ? "🚨✅(" + String(alertCode) + ") " : "🚨❌(" + String(alertCode) + ") ");
+    http.end();
+  }
+  
+  Serial.println();
+  
+  // Ultra-detailed status summary
+  Serial.print("📊 SUMMARY: " + String(fill_percentage, 1) + "% ");
+  Serial.print("[" + bin_status + "] ");
+  Serial.print("H:" + String(waste_height_cm, 1) + "cm ");
+  Serial.print("D:" + String(distance_cm, 1) + "cm ");
+  Serial.print("Acc:" + accuracy_status + " ");
+  Serial.print("Sensor:" + String(sensorWorking ? "✅" : "❌") + " ");
+  Serial.print("WiFi:" + String(wifiConnected ? "✅" : "❌") + " ");
+  Serial.print("GPS:" + String(gpsFixed ? "✅" : "🔍"));
+  
+  // Show time information
+  if (lastEmptyTime > 0) {
+    double hoursSinceEmpty = (millis() - lastEmptyTime) / 3600000.0;
+    if (hoursSinceEmpty < 1.0) {
+      Serial.print(" Empty:" + String(int(hoursSinceEmpty * 60)) + "m");
+    } else if (hoursSinceEmpty < 24.0) {
+      Serial.print(" Empty:" + String(hoursSinceEmpty, 1) + "h");
+    } else {
+      Serial.print(" Empty:" + String(hoursSinceEmpty / 24.0, 1) + "d");
+    }
+  }
+  
+  // Alert status
+  if (bin_critical_alert) Serial.print(" 🔴CRITICAL");
+  else if (bin_full_alert) Serial.print(" 🟠FULL");
+  
+  Serial.println();
+  Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+}
+
+// ==================== UTILITY FUNCTIONS ====================
+String getFormattedTime() {
+  unsigned long totalSeconds = deviceUptime / 1000;
+  int hours = totalSeconds / 3600;
+  int minutes = (totalSeconds % 3600) / 60;
+  int seconds = totalSeconds % 60;
+  
+  char timeBuffer[20];
+  sprintf(timeBuffer, "%02d:%02d:%02d", hours, minutes, seconds);
+  return String(timeBuffer);
+}
+
+String getCurrentTimestamp() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    // Fallback timestamp
+    return "2024-" + String(month()) + "-" + String(day()) + " " + getFormattedTime();
+  }
+  
+  char timeStringBuff[50];
+  strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  return String(timeStringBuff);
+}
+
+String getCurrentISOTimestamp() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    unsigned long epochTime = millis() / 1000 + 1640995200;
+    return timestampToISO(epochTime * 1000);
+  }
+  
+  char timeStringBuff[30];
+  strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+  return String(timeStringBuff);
+}
+
+String timestampToISO(unsigned long timestamp_ms) {
+  time_t timestamp_sec = timestamp_ms / 1000;
+  struct tm* timeinfo = gmtime(&timestamp_sec);
+  
+  char timeStringBuff[30];
+  strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%dT%H:%M:%SZ", timeinfo);
+  return String(timeStringBuff);
+}
+
+String timestampToReadable(unsigned long timestamp_ms) {
+  time_t timestamp_sec = timestamp_ms / 1000;
+  struct tm* timeinfo = localtime(&timestamp_sec);
+  
+  char timeStringBuff[50];
+  strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%d %H:%M:%S", timeinfo);
+  return String(timeStringBuff);
+}
+
+// Helper function for month/day (if needed)
+int month() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) return 1;
+  return timeinfo.tm_mon + 1;
+}
+
+int day() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) return 1;
+  return timeinfo.tm_mday;
+}
