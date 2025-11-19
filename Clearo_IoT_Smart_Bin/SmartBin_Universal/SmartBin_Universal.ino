@@ -15,10 +15,9 @@ const char* password = "12345678";
 const char* project_id = "clearo-73407";
 const char* firestore_api_key = "AIzaSyD4km-aHvRYdofBFLCLYWXlarY-Jsj_CBk";
 
-// ⚠️ ⚠️ ⚠️ CHANGE THIS FOR EACH BIN ⚠️ ⚠️ ⚠️
 const char* bin_id = "SMART_BIN_003_S";
 const char* location_name = "236 Lakdam Studio";
-const bool has_gps = true;                        
+const bool has_gps = true;                             // CHANGE THIS
 
 // Firestore collections
 const char* bins_collection = "smart_bins";
