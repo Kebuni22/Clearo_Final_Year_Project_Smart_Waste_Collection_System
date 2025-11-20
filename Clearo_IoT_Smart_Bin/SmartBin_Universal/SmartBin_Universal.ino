@@ -17,7 +17,7 @@ const char* firestore_api_key = "AIzaSyD4km-aHvRYdofBFLCLYWXlarY-Jsj_CBk";
 
 const char* bin_id = "SMART_BIN_003_S";
 const char* location_name = "236 Lakdam Studio";
-const bool has_gps = true;                             // CHANGE THIS
+const bool has_gps = true;               // CHANGE THIS
 
 // Firestore collections
 const char* bins_collection = "smart_bins";
