@@ -33,7 +33,10 @@ const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssue
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-green-200 transform hover:-translate-y-1">
+        <div 
+          className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-green-200 transform hover:-translate-y-1 cursor-pointer"
+          onClick={() => setSelectedView('residents')}
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="p-4 bg-gradient-to-br from-green-100 to-green-200 rounded-2xl group-hover:from-green-200 group-hover:to-green-300 transition-all duration-300">
               <FaUsers className="text-3xl text-green-600" />
@@ -46,7 +49,10 @@ const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssue
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1">
+        <div 
+          className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-blue-200 transform hover:-translate-y-1 cursor-pointer"
+          onClick={() => setSelectedView('binStatus')}
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="p-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl group-hover:from-blue-200 group-hover:to-blue-300 transition-all duration-300">
               <FaTrashAlt className="text-3xl text-blue-600" />
@@ -59,7 +65,10 @@ const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssue
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-yellow-200 transform hover:-translate-y-1">
+        <div 
+          className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-yellow-200 transform hover:-translate-y-1 cursor-pointer"
+          onClick={() => setSelectedView('binRequests')}
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="p-4 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-2xl group-hover:from-yellow-200 group-hover:to-yellow-300 transition-all duration-300">
               <FaClipboardList className="text-3xl text-yellow-600" />
@@ -67,12 +76,24 @@ const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssue
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-1">Bin Requests</h3>
-            <p className="text-3xl font-bold text-yellow-600">{binRequests.length}</p>
-            <p className="text-sm text-gray-500 mt-2">Awaiting approval</p>
+            <p className="text-3xl font-bold text-yellow-600">{binRequests?.length || 0}</p>
+            <p className="text-sm text-gray-500 mt-2">
+              {binRequests?.length === 0 ? (
+                <span className="text-green-600">✓ All requests processed</span>
+              ) : binRequests?.length === 1 ? (
+                'Awaiting approval'
+              ) : (
+                'Awaiting approval'
+              )}
+            </p>
           </div>
         </div>
 
-        <div className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-red-200 transform hover:-translate-y-1">
+        {/* Reported Issues Card */}
+        <div 
+          className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 hover:border-red-200 transform hover:-translate-y-1 cursor-pointer"
+          onClick={() => setSelectedView('reportedIssues')}
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="p-4 bg-gradient-to-br from-red-100 to-red-200 rounded-2xl group-hover:from-red-200 group-hover:to-red-300 transition-all duration-300">
               <FaExclamationCircle className="text-3xl text-red-600" />
@@ -80,8 +101,16 @@ const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssue
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-1">Reported Issues</h3>
-            <p className="text-3xl font-bold text-red-600">{reportedIssues.length}</p>
-            <p className="text-sm text-gray-500 mt-2">Require attention</p>
+            <p className="text-3xl font-bold text-red-600">{reportedIssues?.length || 0}</p>
+            <p className="text-sm text-gray-500 mt-2">
+              {reportedIssues?.length === 0 ? (
+                <span className="text-green-600">✓ No pending issues</span>
+              ) : reportedIssues?.length === 1 ? (
+                'Needs attention'
+              ) : (
+                'Need attention'
+              )}
+            </p>
           </div>
         </div>
       </div>

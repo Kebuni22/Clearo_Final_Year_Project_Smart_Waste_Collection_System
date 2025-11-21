@@ -1407,7 +1407,7 @@ const Schedules = () => {
           return schedDate >= weekStart && schedDate <= weekEnd;
         })
       };
-    }s
+    }
 
     // Calculate comprehensive statistics
     const wasteTypeStats = {};
@@ -1854,7 +1854,7 @@ const Schedules = () => {
             {getTodaySchedules().length > 0 ? (
               <>
                 {/* Waste Type Label */}
-                <div className="flex items-center mb-3 p-2 bg-white rounded-lg border border-blue-200">
+                               <div className="flex items-center mb-3 p-2 bg-white rounded-lg border border-blue-200">
                   <div className={`w-4 h-4 ${getWasteTypeInfo(getTodaySchedules()[0]?.wasteType).color} rounded-full mr-2`}></div>
                   <span className="text-blue-800 font-medium">{getTodaySchedules()[0]?.wasteType} Collection</span>
                 </div>
@@ -2156,7 +2156,7 @@ const Schedules = () => {
         </div>
       </div>
 
-      {/* Waste Type Management Section - Enhanced Horizontal Cards */}
+      {/* Waste Type Management Section - Simplified Cards */}
       <div className="mt-8">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -2190,7 +2190,6 @@ const Schedules = () => {
                     {/* Waste Type Name */}
                     <div className="flex-1">
                       <h4 className="font-semibold text-base">{wasteType.name}</h4>
-                      <p className="text-xs opacity-75 mt-1">Collection Type</p>
                     </div>
 
                     {/* Action Buttons - Show on Hover */}
@@ -2220,37 +2219,8 @@ const Schedules = () => {
                         </>
                       )}
                     </div>
-
-                    {/* Usage Count Badge */}
-                    <div className="absolute -top-2 -right-2">
-                      <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-gray-400 rounded-full shadow-sm">
-                        {schedules.filter(s => s.wasteType === wasteType.name).length}
-                      </span>
-                    </div>
                   </div>
                 ))}
-              </div>
-
-              {/* Summary Stats */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{wasteTypes.length}</div>
-                    <div className="text-sm text-gray-600">Total Waste Types</div>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {wasteTypes.filter(wt => schedules.some(s => s.wasteType === wt.name)).length}
-                    </div>
-                    <div className="text-sm text-gray-600">Active Types</div>
-                  </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {schedules.length}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Schedules</div>
-                  </div>
-                </div>
               </div>
             </div>
           ) : (
@@ -2298,43 +2268,16 @@ const Schedules = () => {
             <div className="p-6">
               <div className="flex flex-wrap gap-4 justify-start">
                 {roadCategories.map((category) => (
-                  <div 
-                    key={category.id} 
-                    className="relative group flex items-center bg-gray-50 hover:bg-gray-100 px-6 py-4 rounded-xl border-2 border-transparent hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow-md min-w-[160px] cursor-pointer"
+                  <div
+                    key={category.id}
+                    className="flex items-center bg-gray-50 px-6 py-4 rounded-xl border-2 border-dashed border-gray-300 min-w-[160px]"
                   >
-                    {/* Colored Circle Indicator */}
-                    <div className={`w-5 h-5 ${category.color || 'bg-gray-300'} rounded-full mr-3 flex-shrink-0 shadow-sm`}></div>
-                    
-                    {/* Category Name */}
+                    <div className={`w-3 h-3 ${category.color || 'bg-gray-300'} rounded-full mr-3 flex-shrink-0`}></div>
                     <div className="flex-1">
                       <h4 className="font-semibold text-base text-gray-900">{category.name}</h4>
                       <p className="text-xs text-gray-500 mt-1">
                         {roads.filter(r => r.categoryId === category.id).length} roads
                       </p>
-                    </div>
-
-                    {/* Action Buttons - Show on Hover */}
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditCategory(category);
-                        }}
-                        className="p-1.5 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full text-blue-600 hover:text-blue-700 transition-colors shadow-sm"
-                        title="Edit Category"
-                      >
-                        <FaEdit className="text-xs" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCategory(category.id);
-                        }}
-                        className="p-1.5 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full text-red-600 hover:text-red-700 transition-colors shadow-sm"
-                        title="Delete Category"
-                      >
-                        <FaTrash className="text-xs" />
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -2342,7 +2285,7 @@ const Schedules = () => {
                 {/* Uncategorized Roads Card */}
                 {roads.filter(r => !r.categoryId).length > 0 && (
                   <div className="flex items-center bg-gray-50 px-6 py-4 rounded-xl border-2 border-dashed border-gray-300 min-w-[160px]">
-                    <div className="w-5 h-5 bg-gray-300 rounded-full mr-3 flex-shrink-0"></div>
+                    <div className="w-3 h-3 bg-gray-300 rounded-full mr-3 flex-shrink-0"></div>
                     <div className="flex-1">
                       <h4 className="font-semibold text-base text-gray-700">Uncategorized</h4>
                       <p className="text-xs text-gray-500 mt-1">
@@ -3251,13 +3194,13 @@ const Schedules = () => {
                   <table className="min-w-full border border-gray-200 rounded-lg">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Road Name
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Assigned Time Slot
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
                         </th>
                       </tr>
@@ -3267,7 +3210,7 @@ const Schedules = () => {
                         const road = roads.find(r => r.id === schedule.roadId);
                         return (
                           <tr key={schedule.id || index} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap border-b">
+                            <td className="px-4 py-4 whitespace-nowrap border-b">
                               <div className="flex items-center">
                                 <FaMapMarkerAlt className="text-gray-400 mr-2" />
                                 <span className="text-sm font-medium text-gray-900">
@@ -3275,13 +3218,13 @@ const Schedules = () => {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap border-b">
+                            <td className="px-4 py-4 whitespace-nowrap border-b">
                               <div className="flex items-center">
                                 <FaClock className="text-gray-400 mr-2" />
                                 <span className="text-sm text-gray-900">{schedule.timeSlot}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap border-b">
+                            <td className="px-4 py-4 whitespace-nowrap border-b">
                               <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-200">
                                 Completed
                               </span>
@@ -3386,23 +3329,19 @@ const Schedules = () => {
                             Waste Type
                           </th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                                                  Count
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Percentage
+                            Collections
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {Object.entries(weeklyReportData.statistics.wasteTypeStats).map(([type, count]) => (
-                          <tr key={type}>
-                            <td className="px-4 py-2 text-sm text-gray-900">{type}</td>
-                            <td className="px-4 py-2 text-sm text-gray-900">{count}</td>
-                            <td className="px-4 py-2 text-sm text-gray-900">
-                              {Math.round((count / weeklyReportData.statistics.totalRoutes) * 100)}%
-                            </td>
-                          </tr>
-                        ))}
+                        {Object.entries(weeklyReportData.statistics.wasteTypeStats)
+                          .sort(([,a], [,b]) => b - a)
+                          .map(([type, count]) => (
+                            <tr key={type}>
+                              <td className="px-4 py-2 text-sm text-gray-900">{type}</td>
+                              <td className="px-4 py-2 text-sm text-gray-900">{count}</td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>

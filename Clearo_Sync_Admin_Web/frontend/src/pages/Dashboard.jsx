@@ -170,7 +170,11 @@ export default function Dashboard() {
 
         // Fetch reported issues
         const issuesSnapshot = await getDocs(collection(db, 'reportedIssues'));
-        setReportedIssues(issuesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const issuesData = issuesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setReportedIssues(issuesData);
+        
+        console.log('Reported Issues Count:', issuesData.length);
+        console.log('Reported Issues Data:', issuesData);
       } catch (err) {
         console.error('Error fetching overview data:', err);
       }
@@ -582,12 +586,7 @@ export default function Dashboard() {
               <p className="text-base font-medium text-gray-800">{userData?.phone || 'Not provided'}</p>
             </div>
           </div>
-          <button
-            onClick={handleEditUser}
-            className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            Edit
-          </button>
+          {/* Removed duplicate Edit button - now only in footer */}
         </div>
       )}
     </div>
@@ -1105,7 +1104,7 @@ export default function Dashboard() {
               {!isEditing && (
                 <button
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors duration-200 shadow-sm flex items-center"
-                  onClick={() => setIsEditing(true)}
+                  onClick={handleEditUser}
                 >
                   <FaEdit className="mr-2" size={14} />
                   Edit Profile
