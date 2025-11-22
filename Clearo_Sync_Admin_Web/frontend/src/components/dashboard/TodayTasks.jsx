@@ -31,7 +31,11 @@ import {
   FaClipboard
 } from 'react-icons/fa';
 
-// Google Maps component
+// Import custom images
+import truckImage from '../../assets/truck.png';
+import binImage from '../../assets/bin.png';
+
+// Google Maps component with custom images
 const MapComponent = ({ routes, bins, trucks }) => {
   const mapRef = React.useRef(null);
   const [map, setMap] = useState(null);
@@ -43,8 +47,11 @@ const MapComponent = ({ routes, bins, trucks }) => {
     if (!window.google) {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDtfueebmq-XAr53g5JvZk13F7WCPZqC3M&libraries=geometry`;
-      script.onload = () => setIsLoaded(true);
-      script.onerror = () => console.error('Failed to load Google Maps script');
+      script.onload = () => {
+        console.log('✅ Google Maps loaded in TodayTasks');
+        setIsLoaded(true);
+      };
+      script.onerror = () => console.error('❌ Failed to load Google Maps script');
       document.head.appendChild(script);
     } else {
       setIsLoaded(true);
@@ -54,8 +61,8 @@ const MapComponent = ({ routes, bins, trucks }) => {
   useEffect(() => {
     if (isLoaded && mapRef.current && !map) {
       const googleMap = new window.google.maps.Map(mapRef.current, {
-        center: { lat: 7.8731, lng: 80.7718 }, // Sri Lanka center
-        zoom: 12,
+        center: { lat: 6.9271, lng: 79.8612 }, // Colombo, Sri Lanka
+        zoom: 13,
         styles: [
           {
             featureType: 'poi',
@@ -64,116 +71,388 @@ const MapComponent = ({ routes, bins, trucks }) => {
           }
         ]
       });
+      console.log('🗺️ Map initialized');
       setMap(googleMap);
     }
   }, [isLoaded, map]);
 
   useEffect(() => {
     if (map) {
+      console.log('🎨 Rendering markers - Bins:', bins?.length || 0, 'Trucks:', trucks?.length || 0);
+      
       // Clear existing markers
       markers.forEach(marker => marker.setMap(null));
       setMarkers([]);
       const newMarkers = [];
 
-      // Smart bin markers with accurate location and thresholds
+      // Render Bin markers with custom bin.png and status indicator circle
       if (bins && bins.length > 0) {
-        bins.forEach((bin) => {
-          const lat = Number(bin.lat);
-          const lng = Number(bin.lng);
-          if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+        bins.forEach((bin, idx) => {
+          // Get coordinates - handle multiple field names
+          const lat = Number(bin.latitude || bin.lat || bin.coordinates?.lat);
+          const lng = Number(bin.longitude || bin.lng || bin.coordinates?.lng);
+          
+          if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+            console.warn(`❌ Invalid bin coordinates for ${bin.binId || bin.bin_id}:`, lat, lng);
+            return;
+          }
 
-          const pct = Math.max(0, Math.min(100, Number(bin.fillPercentage ?? 0)));
-          const t = bin.thresholds || {};
-          const full = typeof t.full_threshold === 'number' ? t.full_threshold : 85;
-          const high = typeof t.high_threshold === 'number' ? t.high_threshold : 70;
+          console.log(`✅ Rendering bin ${idx + 1}: ${bin.binId || bin.bin_id} at ${lat}, ${lng}`);
 
-          const color = pct >= full ? '#ef4444' : pct >= high ? '#f59e0b' : '#10b981';
+          // Get fill percentage
+          const fillPct = Math.max(0, Math.min(100, 
+            Number(bin.fillPercentage || bin.fill_percentage || bin.fillLevel || 0)
+          ));
 
-          const marker = new window.google.maps.Marker({
-            position: { lat, lng },
-            map,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 11,
-              fillColor: color,
-              fillOpacity: 0.95,
-              strokeWeight: 2,
-              strokeColor: '#ffffff'
-            },
-            label: `${Math.round(pct)}%`,
-            title: `${bin.location || 'Smart Bin'} - ${Math.round(pct)}%`
-          });
+          // Determine size and color based on fill level
+          const size = fillPct >= 80 ? 45 : fillPct >= 50 ? 40 : 35;
+          const statusColor = fillPct >= 80 ? '#EF4444' : // Red
+                             fillPct >= 50 ? '#F59E0B' : // Yellow/Orange
+                             '#10B981'; // Green
 
-          const lastUpdateStr =
-            bin.lastUpdate && typeof bin.lastUpdate?.toDate === 'function'
-              ? bin.lastUpdate.toDate().toLocaleString()
-              : (typeof bin.lastUpdate === 'string' ? bin.lastUpdate : '');
+          // Load bin image as base64 or use direct path
+          // Create marker with bin image and status circle overlay
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = size + 20;
+          canvas.height = size + 20;
 
-          const infoWindow = new window.google.maps.InfoWindow({
-            content: `
-              <div class="p-3">
-                <h3 class="font-bold text-lg">${bin.location || 'Smart Bin'}</h3>
-                ${bin.binId ? `<p><strong>ID:</strong> ${bin.binId}</p>` : ''}
-                <p><strong>Fill:</strong> ${Math.round(pct)}% ${bin.fillLevel ? `(${bin.fillLevel})` : ''}</p>
-                <p><strong>Bin Status:</strong> ${bin.binStatus || 'N/A'}</p>
-                <p><strong>Device Status:</strong> ${bin.status || 'N/A'}</p>
-                ${lastUpdateStr ? `<p><strong>Last Update:</strong> ${lastUpdateStr}</p>` : ''}
-                ${bin.gps?.status ? `<p><strong>GPS:</strong> ${bin.gps.status} (${bin.gps.satellites || 0} sats)</p>` : ''}
-              </div>
-            `
-          });
-          marker.addListener('click', () => infoWindow.open(map, marker));
-          newMarkers.push(marker);
-        });
-      }
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            // Draw bin image
+            ctx.drawImage(img, 10, 10, size, size);
+            
+            // Draw status indicator circle (top right)
+            ctx.beginPath();
+            ctx.arc(size + 10, 10, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = statusColor;
+            ctx.fill();
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Draw percentage text in circle
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(fillPct), size + 10, 10);
 
-      // Truck markers from real-time driver locations (enriched with vehicle info if available)
-      if (trucks && trucks.length > 0) {
-        trucks.forEach(truck => {
-          const { currentLocation } = truck || {};
-          if (!currentLocation?.lat || !currentLocation?.lng) return;
+            // Create marker with composed image
+            const marker = new window.google.maps.Marker({
+              position: { lat, lng },
+              map,
+              icon: {
+                url: canvas.toDataURL(),
+                scaledSize: new window.google.maps.Size(size + 20, size + 20),
+                anchor: new window.google.maps.Point((size + 20) / 2, (size + 20) / 2)
+              },
+              title: `${bin.location || bin.binId || 'Bin'} - ${Math.round(fillPct)}% Full`,
+              zIndex: 900
+            });
 
-          const truckIcon = {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 17h2l.5-2h13l.5 2h2v-5h-3V7H3v10z" fill="${truck.status === 'in-progress' ? '#2563eb' : '#059669'}"/>
-                <circle cx="7" cy="19" r="2" fill="#374151"/>
-                <circle cx="17" cy="19" r="2" fill="#374151"/>
-              </svg>
-            `),
-            scaledSize: new window.google.maps.Size(30, 30)
+            // Info window with color-coded status
+            const statusBadgeColor = fillPct >= 80 ? 'bg-red-100 text-red-800' :
+                                    fillPct >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-green-100 text-green-800';
+
+            const infoWindow = new window.google.maps.InfoWindow({
+              content: `
+                <div class="p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-bold text-lg">${bin.location || bin.binId || 'Smart Bin'}</h3>
+                    <span class="px-2 py-1 rounded-full text-xs font-bold ${statusBadgeColor}">
+                      ${Math.round(fillPct)}%
+                    </span>
+                  </div>
+                  ${bin.binId || bin.bin_id ? `<p class="text-sm"><strong>ID:</strong> ${bin.binId || bin.bin_id}</p>` : ''}
+                  <div class="mt-2 flex items-center space-x-2">
+                    <div class="w-3 h-3 rounded-full" style="background-color: ${statusColor}"></div>
+                    <p class="text-sm"><strong>Status:</strong> 
+                      ${fillPct >= 80 ? 'Critical - Needs Emptying' :
+                        fillPct >= 50 ? 'Medium - Monitor' :
+                        'Good - Low Fill'}
+                    </p>
+                  </div>
+                  ${bin.binStatus || bin.bin_status ? `<p class="text-sm mt-1"><strong>Bin Status:</strong> ${bin.binStatus || bin.bin_status}</p>` : ''}
+                  ${bin.wasteType || bin.waste_type ? `<p class="text-sm"><strong>Waste Type:</strong> ${bin.wasteType || bin.waste_type}</p>` : ''}
+                  <div class="mt-3 w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full" style="width: ${fillPct}%; background-color: ${statusColor}"></div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-2">📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+                </div>
+              `
+            });
+            
+            marker.addListener('click', () => {
+              console.log('🗑️ Bin clicked:', bin);
+              infoWindow.open(map, marker);
+            });
+            
+            newMarkers.push(marker);
+            setMarkers(prev => [...prev, marker]);
           };
-
-          const marker = new window.google.maps.Marker({
-            position: { lat: parseFloat(currentLocation.lat), lng: parseFloat(currentLocation.lng) },
-            map,
-            icon: truckIcon,
-            title: `${truck.vehicleNumber || 'Truck'} - ${truck.driverName || 'Driver'}`
-          });
-
-          const infoWindow = new window.google.maps.InfoWindow({
-            content: `
-              <div class="p-3">
-                <h3 class="font-bold text-lg">${truck.vehicleNumber || 'Truck'}</h3>
-                <p><strong>Driver:</strong> ${truck.driverName || 'Unknown'}</p>
-                <p><strong>Status:</strong> ${truck.status || 'Unknown'}</p>
-                ${truck.assignedRoute ? `<p><strong>Route:</strong> ${truck.assignedRoute}</p>` : ''}
-                ${truck.type ? `<p><strong>Type:</strong> ${truck.type}</p>` : ''}
-                ${truck.capacity ? `<p><strong>Capacity:</strong> ${truck.capacity}</p>` : ''}
-                ${truck.currentLocation?.timestamp ? `<p><strong>Updated:</strong> ${new Date(truck.currentLocation.timestamp?.seconds ? truck.currentLocation.timestamp.seconds * 1000 : truck.currentLocation.timestamp).toLocaleTimeString()}</p>` : ''}
-              </div>
-            `
-          });
-          marker.addListener('click', () => infoWindow.open(map, marker));
-          newMarkers.push(marker);
+          img.src = binImage;
         });
       }
 
-      setMarkers(newMarkers);
+      // Render Truck markers with custom truck.png and complete details
+      if (trucks && trucks.length > 0) {
+        trucks.forEach((truck, idx) => {
+          // Get coordinates from current location
+          const location = truck.currentLocation || truck.location;
+          const lat = Number(location?.lat || location?.latitude);
+          const lng = Number(location?.lng || location?.longitude);
+
+          if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+            console.warn(`❌ Invalid truck coordinates for ${truck.vehicleNumber}:`, lat, lng);
+            return;
+          }
+
+          console.log(`✅ Rendering truck ${idx + 1}: ${truck.vehicleNumber} at ${lat}, ${lng}, Driver: ${truck.driverName}`);
+
+          // Determine status with more details
+          const isOnline = truck.status === 'in-progress' || truck.isOnline;
+          const statusColor = isOnline ? '#10B981' : '#6B7280'; // Green or Gray
+          const statusText = truck.status === 'in-progress' ? 'In Progress' :
+                            truck.status === 'completed' ? 'Completed' :
+                            truck.isOnline ? 'Online' : 'Offline';
+
+          // Get driver name - handle multiple sources
+          const driverName = truck.driverName || truck.driver_name || truck.driver || 'Unknown Driver';
+          const driverId = truck.driverId || truck.driver_id || truck.uid || 'N/A';
+          const vehicleNumber = truck.vehicleNumber || truck.vehicle_number || truck.vehicleNo || 'Unknown Vehicle';
+
+          // Create marker with truck image and status circle
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = 60;
+          canvas.height = 60;
+
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            // Draw truck image
+            ctx.drawImage(img, 10, 10, 40, 40);
+            
+            // Draw status indicator circle (top right)
+            ctx.beginPath();
+            ctx.arc(50, 10, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = statusColor;
+            ctx.fill();
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Draw checkmark or dot for status
+            if (isOnline) {
+              // Draw checkmark
+              ctx.strokeStyle = '#FFFFFF';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(46, 10);
+              ctx.lineTo(48, 12);
+              ctx.lineTo(54, 6);
+              ctx.stroke();
+            } else {
+              // Draw dot
+              ctx.beginPath();
+              ctx.arc(50, 10, 3, 0, 2 * Math.PI);
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fill();
+            }
+
+            // Create marker with composed image
+            const marker = new window.google.maps.Marker({
+              position: { lat, lng },
+              map,
+              icon: {
+                url: canvas.toDataURL(),
+                scaledSize: new window.google.maps.Size(60, 60),
+                anchor: new window.google.maps.Point(30, 30)
+              },
+              title: `${vehicleNumber} - ${driverName}`,
+              zIndex: 1000
+            });
+
+            // Enhanced info window with complete truck details
+            const statusBadge = isOnline ? 
+              'bg-green-100 text-green-800' : 
+              'bg-gray-100 text-gray-800';
+
+            // Format timestamp
+            const lastUpdate = truck.currentLocation?.timestamp || truck.timestamp || truck.updatedAt;
+            let lastUpdateStr = 'N/A';
+            if (lastUpdate) {
+              try {
+                if (lastUpdate.seconds) {
+                  lastUpdateStr = new Date(lastUpdate.seconds * 1000).toLocaleString();
+                } else if (lastUpdate.toDate) {
+                  lastUpdateStr = lastUpdate.toDate().toLocaleString();
+                } else if (typeof lastUpdate === 'number') {
+                  lastUpdateStr = new Date(lastUpdate).toLocaleString();
+                } else if (typeof lastUpdate === 'string') {
+                  lastUpdateStr = new Date(lastUpdate).toLocaleString();
+                }
+              } catch (e) {
+                console.warn('Error parsing timestamp:', e);
+                lastUpdateStr = 'N/A';
+              }
+            }
+
+            const infoWindow = new window.google.maps.InfoWindow({
+              content: `
+                <div class="p-4 min-w-[320px]">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="flex-1">
+                      <h3 class="font-bold text-xl text-gray-900">${vehicleNumber}</h3>
+                      <p class="text-sm text-gray-600 mt-1">ID: ${driverId}</p>
+                    </div>
+                    <span class="px-3 py-1.5 rounded-full text-xs font-bold ${statusBadge} ml-2">
+                      ${statusText}
+                    </span>
+                  </div>
+                  
+                  <div class="space-y-3 mb-3">
+                    <div class="flex items-center space-x-2 pb-2 border-b border-gray-100">
+                      <div class="w-3 h-3 rounded-full ${isOnline ? 'animate-pulse' : ''}" style="background-color: ${statusColor}"></div>
+                      <span class="text-sm font-semibold ${isOnline ? 'text-green-600' : 'text-gray-600'}">
+                        ${statusText}
+                      </span>
+                    </div>
+                    
+                    <div class="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                      <div class="flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <div>
+                          <p class="text-xs text-blue-600 font-medium">Driver Name</p>
+                          <p class="text-base font-bold text-gray-900">${driverName}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                      ${truck.type ? `
+                        <div class="bg-gray-50 rounded-lg p-2">
+                          <p class="text-gray-500 text-xs mb-1">Vehicle Type</p>
+                          <p class="font-semibold text-gray-900">${truck.type}</p>
+                        </div>
+                      ` : ''}
+                      
+                      ${truck.capacity ? `
+                        <div class="bg-gray-50 rounded-lg p-2">
+                          <p class="text-gray-500 text-xs mb-1">Capacity</p>
+                          <p class="font-semibold text-gray-900">${truck.capacity}</p>
+                        </div>
+                      ` : ''}
+                      
+                      ${truck.assignedRoute ? `
+                        <div class="bg-gray-50 rounded-lg p-2 col-span-2">
+                          <p class="text-gray-500 text-xs mb-1">Assigned Route</p>
+                          <p class="font-semibold text-gray-900">${truck.assignedRoute}</p>
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
+                  
+                  <div class="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+                    <div class="flex items-center justify-between text-sm">
+                      <span class="text-gray-600 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Location
+                      </span>
+                      <span class="font-mono text-xs text-gray-900">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between text-sm">
+                      <span class="text-gray-600 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Last Update
+                      </span>
+                      <span class="text-xs text-gray-900">${lastUpdateStr}</span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between text-sm">
+                      <span class="text-gray-600 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                        </svg>
+                        Driver ID
+                      </span>
+                      <span class="text-xs text-gray-900 font-mono">${driverId}</span>
+                    </div>
+                  </div>
+                  
+                  ${isOnline ? `
+                    <div class="mt-3 p-3 bg-green-50 border-2 border-green-200 rounded-lg">
+                      <p class="text-xs text-green-800 text-center font-semibold flex items-center justify-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Vehicle is actively collecting waste
+                      </p>
+                    </div>
+                  ` : `
+                    <div class="mt-3 p-3 bg-gray-100 border-2 border-gray-300 rounded-lg">
+                      <p class="text-xs text-gray-600 text-center font-medium flex items-center justify-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Vehicle is currently offline
+                      </p>
+                    </div>
+                  `}
+                </div>
+              `
+            });
+
+            marker.addListener('click', () => {
+              console.log('🚛 Truck clicked:', {
+                vehicleNumber: vehicleNumber,
+                driverName: driverName,
+                driverId: driverId,
+                status: truck.status,
+                location: { lat, lng },
+                assignedRoute: truck.assignedRoute,
+                type: truck.type,
+                capacity: truck.capacity,
+                lastUpdate: lastUpdateStr
+              });
+              infoWindow.open(map, marker);
+            });
+
+            newMarkers.push(marker);
+            setMarkers(prev => [...prev, marker]);
+          };
+          img.src = truckImage;
+        });
+      }
+
+      console.log(`✓ Rendered ${newMarkers.length} total markers`);
     }
   }, [map, bins, trucks]);
 
-  return <div ref={mapRef} className="w-full h-96 rounded-lg border" />;
+  return (
+    <div>
+      <div ref={mapRef} className="w-full h-96 rounded-lg border-2 border-gray-200" />
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 rounded-lg">
+          <div className="text-center">
+            <FaSpinner className="animate-spin text-3xl text-green-600 mx-auto mb-2" />
+            <p className="text-sm text-gray-600">Loading map...</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default function TodayTasks() {
@@ -207,77 +486,130 @@ export default function TodayTasks() {
 
   // Real-time streams for smart bins and driver locations
   useEffect(() => {
-    // Smart bins stream with accurate mapping
+    console.log('🔄 Setting up real-time data streams...');
+    
+    // Smart bins stream with proper coordinate handling
     const unsubBins = onSnapshot(
       collection(db, 'smart_bins'),
       (snapshot) => {
+        console.log('📦 Smart bins snapshot:', snapshot.size, 'documents');
+        
         const binsData = snapshot.docs.map((d) => {
           const data = d.data();
-          const locName = data.location || data.location_name || data.locationName;
-          const gps = data.location_data || data.locationData || {};
-          const lat = gps?.latitude ?? data.coordinates?.lat ?? data.location?.lat;
-          const lng = gps?.longitude ?? data.coordinates?.lng ?? data.location?.lng;
+          
+          // Handle multiple coordinate field structures
+          const lat = data.latitude || data.coordinates?.lat || data.location?.lat || data.lat;
+          const lng = data.longitude || data.coordinates?.lng || data.location?.lng || data.lng;
+          
+          // Handle fill percentage from multiple sources
+          const fillPct = data.fill_percentage || 
+                         data.fillPercentage || 
+                         data.fill_data?.fill_percentage || 
+                         0;
 
-          const fd = data.fill_data || {};
-          const fillPct =
-            typeof fd.fill_percentage === 'number'
-              ? fd.fill_percentage
-              : typeof data.fill_percentage === 'number'
-              ? data.fill_percentage
-              : 0;
-
-          return {
+          const bin = {
             id: d.id,
-            binId: data.bin_id,
-            location: locName || 'Unknown Location',
-            lat,
-            lng,
-            fillPercentage: fillPct,
-            fillLevel: fd.fill_level,          // e.g., 'MEDIUM'
-            binStatus: fd.bin_status,          // e.g., 'HALF_FULL'
-            status: data.status,               // device status e.g., 'ERROR'
-            thresholds: data.thresholds || {},
-            lastUpdate: data.system?.last_update || data.timestamp,
-            gps: {
-              status: gps?.status,
-              satellites: gps?.satellites
-            }
+            binId: data.bin_id || d.id,
+            location: data.location || data.location_name || data.address || 'Unknown Location',
+            latitude: Number(lat),
+            longitude: Number(lng),
+            fillPercentage: Number(fillPct),
+            fillLevel: data.fill_level || data.fill_data?.fill_level,
+            binStatus: data.bin_status || data.fill_data?.bin_status,
+            wasteType: data.waste_type || 'General',
+            status: data.status,
+            lastUpdate: data.timestamp || data.system?.last_update
           };
-        }).filter(b => typeof b.lat === 'number' && typeof b.lng === 'number');
 
+          console.log('Processed bin:', bin.binId, 'at', bin.latitude, bin.longitude, 'fill:', bin.fillPercentage + '%');
+          return bin;
+        }).filter(b => {
+          const isValid = typeof b.latitude === 'number' && 
+                         typeof b.longitude === 'number' && 
+                         !isNaN(b.latitude) && 
+                         !isNaN(b.longitude) &&
+                         b.latitude !== 0 && 
+                         b.longitude !== 0;
+          if (!isValid) {
+            console.warn('⚠️ Filtered out bin with invalid coordinates:', b.binId);
+          }
+          return isValid;
+        });
+
+        console.log(`✓ Loaded ${binsData.length} valid bins`);
         setBins(binsData);
       },
-      (err) => console.error('smart_bins onSnapshot error:', err)
+      (err) => console.error('❌ smart_bins onSnapshot error:', err)
     );
 
-    // Driver locations stream
-    const unsubDrivers = onSnapshot(collection(db, 'driver_locations'), (snapshot) => {
-      const driverLocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      // Build trucks from driver locations + vehicles info (if available)
-      const trucksFromDrivers = driverLocs.map((dl) => {
-        const vById = vehiclesLookup[dl.vehicleId || ''] || {};
-        const vByDriver = vehiclesLookup[`driver:${dl.driverName || ''}`] || {};
-        const enriched = vById.vehicleNumber ? vById : vByDriver.vehicleNumber ? vByDriver : {};
-        return {
-          id: dl.id,
-          driverId: dl.driverId,
-          driverName: dl.driverName,
-          status: dl.status || 'in-progress',
-          assignedRoute: dl.assignedRoute,
-          vehicleNumber: dl.vehicleNumber || enriched.vehicleNumber,
-          type: enriched.type,
-          capacity: enriched.capacity,
-          currentLocation: {
-            lat: dl.latitude ?? dl.lat,
-            lng: dl.longitude ?? dl.lng,
-            timestamp: dl.timestamp || dl.updatedAt
+    // Driver locations stream with proper coordinate handling
+    const unsubDrivers = onSnapshot(
+      collection(db, 'driver_locations'),
+      (snapshot) => {
+        console.log('📦 Driver locations snapshot:', snapshot.size, 'documents');
+        
+        const driverLocs = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          
+          // Handle multiple coordinate field names
+          const lat = data.latitude || data.lat;
+          const lng = data.longitude || data.lng;
+
+          console.log('Processing driver location:', data.driverName, 'at', lat, lng);
+          
+          return { 
+            id: doc.id, 
+            ...data,
+            latitude: Number(lat),
+            longitude: Number(lng)
+          };
+        });
+
+        // Enrich with vehicle data
+        const trucksFromDrivers = driverLocs.map((dl) => {
+          const vById = vehiclesLookup[dl.vehicleId || ''] || {};
+          const vByDriver = vehiclesLookup[`driver:${dl.driverName || ''}`] || {};
+          const enriched = vById.vehicleNumber ? vById : vByDriver.vehicleNumber ? vByDriver : {};
+          
+          const truck = {
+            id: dl.id,
+            driverId: dl.driverId || dl.id,
+            driverName: dl.driverName || 'Unknown Driver',
+            status: dl.status || 'in-progress',
+            assignedRoute: dl.assignedRoute,
+            vehicleNumber: dl.vehicleNumber || enriched.vehicleNumber || 'Unknown Vehicle',
+            type: enriched.type,
+            capacity: enriched.capacity,
+            currentLocation: {
+              lat: dl.latitude,
+              lng: dl.longitude,
+              timestamp: dl.timestamp || dl.updatedAt
+            }
+          };
+
+          console.log('Processed truck:', truck.vehicleNumber, 'at', truck.currentLocation.lat, truck.currentLocation.lng);
+          return truck;
+        }).filter(t => {
+          const isValid = t.currentLocation.lat && 
+                         t.currentLocation.lng && 
+                         !isNaN(t.currentLocation.lat) && 
+                         !isNaN(t.currentLocation.lng) &&
+                         t.currentLocation.lat !== 0 && 
+                         t.currentLocation.lng !== 0;
+          if (!isValid) {
+            console.warn('⚠️ Filtered out truck with invalid coordinates:', t.vehicleNumber);
           }
-        };
-      });
-      setTrucks(trucksFromDrivers);
-    }, (err) => console.error('driver_locations onSnapshot error:', err));
+          return isValid;
+        });
+
+        console.log(`✓ Loaded ${trucksFromDrivers.length} valid trucks`);
+        setTrucks(trucksFromDrivers);
+      },
+      (err) => console.error('❌ driver_locations onSnapshot error:', err)
+    );
 
     return () => {
+      console.log('🔄 Cleaning up real-time streams');
       unsubBins();
       unsubDrivers();
     };
@@ -900,29 +1232,65 @@ export default function TodayTasks() {
       {/* Map View */}
       {showMapView && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <FaMap className="mr-2 text-green-600" />
-            Live Route Tracking & Bin Status
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center">
+              <FaMap className="mr-2 text-green-600" />
+              Live Route Tracking & Bin Status
+            </h2>
+            <div className="flex items-center space-x-4 text-sm">
+              <div className="bg-purple-50 px-3 py-1 rounded-full">
+                <span className="font-semibold text-purple-600">🚛 {trucks.length} Trucks</span>
+              </div>
+              <div className="bg-blue-50 px-3 py-1 rounded-full">
+                <span className="font-semibold text-blue-600">🗑️ {bins.length} Bins</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Map Component */}
           <MapComponent routes={routes} bins={bins} trucks={trucks} />
           
           {/* Map Legend */}
-          <div className="mt-4 flex items-center justify-center space-x-6 text-sm">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span>Low Fill (&lt;40%)</span>
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Map Legend</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">
+                  <FaTrash size={10} />
+                </div>
+                <span className="text-gray-700">Bins &lt;50% Full</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-7 h-7 bg-yellow-500 rounded-full flex items-center justify-center text-white text-xs">
+                  <FaTrash size={11} />
+                </div>
+                <span className="text-gray-700">Bins 50-80% Full</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
+                  <FaTrash size={12} />
+                </div>
+                <span className="text-gray-700">Bins &gt;80% Full</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <FaTruck className="text-purple-600 text-xl" />
+                <span className="text-gray-700">Active Collection Trucks</span>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <span>Medium Fill (40-80%)</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              <span>High Fill (&gt;80%)</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <FaTruck className="text-green-600" />
-              <span>Active Trucks</span>
+          </div>
+
+          {/* Map Data Status */}
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-semibold text-blue-900">📍 Map Status:</span>
+                <span className="ml-2 text-blue-800">
+                  {bins.length} bin(s) and {trucks.length} truck(s) being tracked in real-time
+                </span>
+              </div>
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
+                ✓ Live Updates Active
+              </span>
             </div>
           </div>
         </div>

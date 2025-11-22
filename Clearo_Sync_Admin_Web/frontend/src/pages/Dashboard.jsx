@@ -793,6 +793,7 @@ export default function Dashboard() {
         />
       );
     }
+    
     if (selectedView === 'todayTasks') {
       return <TodayTasks />;
     }

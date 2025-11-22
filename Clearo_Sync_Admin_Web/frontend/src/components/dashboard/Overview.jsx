@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaUsers, FaTrashAlt, FaClipboardList, FaExclamationCircle, FaCogs, FaCalendarAlt, FaTruck, FaLeaf } from 'react-icons/fa';
+import { FaUsers, FaTrashAlt, FaClipboardList, FaExclamationCircle, FaCogs, FaCalendarAlt, FaTruck, FaLeaf, FaTasks } from 'react-icons/fa';
 
 const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssues, setSelectedView }) => {
   const currentHour = new Date().getHours();
@@ -125,6 +125,13 @@ const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssue
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <button
+            onClick={() => setSelectedView('todayTasks')}
+            className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-all duration-300 group border border-blue-200 hover:border-blue-300"
+          >
+            <FaTasks className="text-3xl text-blue-600 mb-3 group-hover:scale-110 transition-transform" />
+            <div className="text-sm font-semibold text-gray-800">Today Tasks</div>
+          </button>
+          <button
             onClick={() => setSelectedView('schedules')}
             className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl hover:from-green-100 hover:to-green-200 transition-all duration-300 group border border-green-200 hover:border-green-300"
           >
@@ -137,13 +144,6 @@ const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssue
           >
             <FaTruck className="text-3xl text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
             <div className="text-sm font-semibold text-gray-800">Immediate Pickups</div>
-          </button>
-          <button
-            onClick={() => setSelectedView('residents')}
-            className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-all duration-300 group border border-blue-200 hover:border-blue-300"
-          >
-            <FaUsers className="text-3xl text-blue-600 mb-3 group-hover:scale-110 transition-transform" />
-            <div className="text-sm font-semibold text-gray-800">View Residents</div>
           </button>
           <button
             onClick={() => setSelectedView('reportedIssues')}
