@@ -497,46 +497,58 @@ export default function TodayTasks() {
         const binsData = snapshot.docs.map((d) => {
           const data = d.data();
           
-          // Handle multiple coordinate field structures
-          const lat = data.latitude || data.coordinates?.lat || data.location?.lat || data.lat;
-          const lng = data.longitude || data.coordinates?.lng || data.location?.lng || data.lng;
+          // Handle multiple coordinate field structures with priority order
+          const lat = Number(data.latitude || data.coordinates?.lat || data.location?.lat || data.lat || 0);
+          const lng = Number(data.longitude || data.coordinates?.lng || data.location?.lng || data.lng || 0);
           
           // Handle fill percentage from multiple sources
-          const fillPct = data.fill_percentage || 
+          const fillPct = Number(data.fill_percentage || 
                          data.fillPercentage || 
                          data.fill_data?.fill_percentage || 
-                         0;
+                         0);
 
           const bin = {
             id: d.id,
             binId: data.bin_id || d.id,
-            location: data.location || data.location_name || data.address || 'Unknown Location',
-            latitude: Number(lat),
-            longitude: Number(lng),
-            fillPercentage: Number(fillPct),
-            fillLevel: data.fill_level || data.fill_data?.fill_level,
-            binStatus: data.bin_status || data.fill_data?.bin_status,
+            location: data.location || data.location_name || data.address || `Bin ${d.id.substring(0, 8)}`,
+            latitude: lat,
+            longitude: lng,
+            fillPercentage: Math.round(fillPct),
+            fillLevel: data.fill_level || data.fill_data?.fill_level || 'UNKNOWN',
+            binStatus: data.bin_status || data.fill_data?.bin_status || 'UNKNOWN',
             wasteType: data.waste_type || 'General',
-            status: data.status,
-            lastUpdate: data.timestamp || data.system?.last_update
+            status: data.status || 'active',
+            lastUpdate: data.timestamp || data.last_updated || data.system?.last_update,
+            has_gps: data.has_gps,
+            location_set_by_resident: data.location_set_by_resident,
+            is_online: data.is_online || false
           };
 
-          console.log('Processed bin:', bin.binId, 'at', bin.latitude, bin.longitude, 'fill:', bin.fillPercentage + '%');
+          console.log(`✓ Processed bin ${bin.binId}: lat=${bin.latitude}, lng=${bin.longitude}, fill=${bin.fillPercentage}%`);
           return bin;
         }).filter(b => {
-          const isValid = typeof b.latitude === 'number' && 
-                         typeof b.longitude === 'number' && 
-                         !isNaN(b.latitude) && 
-                         !isNaN(b.longitude) &&
-                         b.latitude !== 0 && 
-                         b.longitude !== 0;
-          if (!isValid) {
-            console.warn('⚠️ Filtered out bin with invalid coordinates:', b.binId);
+          // Only filter out bins with explicitly invalid coordinates (0,0 or NaN)
+          // But keep bins with valid GPS coordinates
+          const hasValidCoords = !isNaN(b.latitude) && 
+                                 !isNaN(b.longitude) && 
+                                 b.latitude !== 0 && 
+                                 b.longitude !== 0;
+          
+          if (!hasValidCoords) {
+            console.warn(`⚠️ Filtered out bin ${b.binId} - Invalid coordinates: ${b.latitude}, ${b.longitude}`);
           }
-          return isValid;
+          
+          return hasValidCoords;
         });
 
-        console.log(`✓ Loaded ${binsData.length} valid bins`);
+        console.log(`✅ Loaded ${binsData.length} valid bins with GPS coordinates out of ${snapshot.size} total`);
+        
+        // Log bins that were filtered out
+        const filteredCount = snapshot.size - binsData.length;
+        if (filteredCount > 0) {
+          console.warn(`⚠️ ${filteredCount} bins filtered out due to invalid/missing GPS coordinates`);
+        }
+        
         setBins(binsData);
       },
       (err) => console.error('❌ smart_bins onSnapshot error:', err)
@@ -1235,14 +1247,14 @@ export default function TodayTasks() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-800 flex items-center">
               <FaMap className="mr-2 text-green-600" />
-              Live Route Tracking & Bin Status
+              Live Route Tracking & All Bin Locations
             </h2>
             <div className="flex items-center space-x-4 text-sm">
               <div className="bg-purple-50 px-3 py-1 rounded-full">
                 <span className="font-semibold text-purple-600">🚛 {trucks.length} Trucks</span>
               </div>
               <div className="bg-blue-50 px-3 py-1 rounded-full">
-                <span className="font-semibold text-blue-600">🗑️ {bins.length} Bins</span>
+                <span className="font-semibold text-blue-600">🗑️ {bins.length} Smart Bins</span>
               </div>
             </div>
           </div>
@@ -1250,47 +1262,91 @@ export default function TodayTasks() {
           {/* Map Component */}
           <MapComponent routes={routes} bins={bins} trucks={trucks} />
           
-          {/* Map Legend */}
+          {/* Enhanced Map Legend */}
           <div className="mt-4 p-4 bg-gray-50 rounded-lg">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Map Legend</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
               <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs relative">
                   <FaTrash size={10} />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-600 rounded-full border-2 border-white"></div>
                 </div>
-                <span className="text-gray-700">Bins &lt;50% Full</span>
+                <span className="text-gray-700">Low (&lt;50%)</span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-7 h-7 bg-yellow-500 rounded-full flex items-center justify-center text-white text-xs">
+                <div className="w-7 h-7 bg-yellow-500 rounded-full flex items-center justify-center text-white text-xs relative">
                   <FaTrash size={11} />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-600 rounded-full border-2 border-white"></div>
                 </div>
-                <span className="text-gray-700">Bins 50-80% Full</span>
+                <span className="text-gray-700">Medium (50-80%)</span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
+                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-xs relative">
                   <FaTrash size={12} />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 rounded-full border-2 border-white"></div>
                 </div>
-                <span className="text-gray-700">Bins &gt;80% Full</span>
+                <span className="text-gray-700">Critical (&gt;80%)</span>
               </div>
               <div className="flex items-center space-x-2">
                 <FaTruck className="text-purple-600 text-xl" />
-                <span className="text-gray-700">Active Collection Trucks</span>
+                <span className="text-gray-700">Active Trucks</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-gray-700">Live Updates</span>
               </div>
             </div>
           </div>
 
-          {/* Map Data Status */}
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="font-semibold text-blue-900">📍 Map Status:</span>
-                <span className="ml-2 text-blue-800">
-                  {bins.length} bin(s) and {trucks.length} truck(s) being tracked in real-time
-                </span>
+          {/* Enhanced Map Data Status */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-blue-600 font-medium">Total Bins</p>
+                  <p className="text-2xl font-bold text-blue-700">{bins.length}</p>
+                </div>
+                <FaTrash className="text-3xl text-blue-300" />
               </div>
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
-                ✓ Live Updates Active
-              </span>
+            </div>
+            
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-green-600 font-medium">Online Bins</p>
+                  <p className="text-2xl font-bold text-green-700">
+                    {bins.filter(b => b.is_online).length}
+                  </p>
+                </div>
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              </div>
+            </div>
+            
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-red-600 font-medium">Critical Bins</p>
+                  <p className="text-2xl font-bold text-red-700">
+                    {bins.filter(b => b.fillPercentage >= 80).length}
+                  </p>
+                </div>
+                <FaExclamationTriangle className="text-2xl text-red-300" />
+              </div>
+            </div>
+          </div>
+
+          {/* GPS Status Info */}
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+            <div className="flex items-center space-x-2">
+              <FaMapMarkerAlt className="text-yellow-600" />
+              <div className="flex-1">
+                <p className="font-semibold text-yellow-900">GPS Coverage Status:</p>
+                <p className="text-yellow-800 text-xs mt-1">
+                  {bins.filter(b => b.has_gps === true).length} bins with built-in GPS • 
+                  {bins.filter(b => b.has_gps === false && b.location_set_by_resident).length} bins with resident-set locations • 
+                  {bins.filter(b => b.has_gps === false && !b.location_set_by_resident).length} bins pending location setup
+                </p>
+              </div>
             </div>
           </div>
         </div>

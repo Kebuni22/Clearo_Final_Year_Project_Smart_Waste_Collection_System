@@ -6,6 +6,7 @@ import 'package:location/location.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TruckTrackingScreen extends StatefulWidget {
   const TruckTrackingScreen({Key? key}) : super(key: key);
@@ -24,8 +25,8 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
   final Color _darkColor = const Color(0xFF4A7856);
 
   // Driver's device location will be the truck location
-  LatLng? _truckLocation = const LatLng(6.9344, 79.8428); // demo truck fallback
-  final LatLng _userLocation = const LatLng(6.9271, 79.8612); // destination
+  LatLng? _truckLocation;
+  LatLng? _userLocation; // Will be set from device location
 
   // Location services
   Location location = Location();
@@ -46,11 +47,19 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
   BitmapDescriptor? _truckIcon;
   BitmapDescriptor? _userIcon;
 
+  // Driver's real-time location from Firebase
+  StreamSubscription<QuerySnapshot>? _driverLocationSubscription;
+  bool _isDriverOnline = false;
+  double _truckSpeed = 0.0;
+  double _truckHeading = 0.0;
+  String _driverName = 'Collection Truck';
+
   @override
   void initState() {
     super.initState();
     _loadCustomIcons();
-    _initializeLocation();
+    _requestLocationPermissionAndInitialize();
+    _startListeningToDriverLocation(); // Start listening to driver location
   }
 
   // Replace default marker hues with custom-drawn icons
@@ -133,106 +142,205 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
     return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
   }
 
-  Future<void> _initializeLocation() async {
-    await _checkLocationPermissions();
-    if (_serviceEnabled && _permissionGranted == PermissionStatus.granted) {
-      await _getCurrentLocation();
-      _startLocationTracking();
+  Future<void> _requestLocationPermissionAndInitialize() async {
+    // Request location permission first
+    bool permissionGranted = await _requestLocationPermission();
+
+    if (permissionGranted) {
+      // Get user's device location
+      await _getUserDeviceLocation();
+
+      // Then initialize truck tracking
+      await _initializeLocation();
     } else {
-      // Use mock data for demonstration
+      // Show permission denied message
       setState(() {
-        _truckLocation = const LatLng(6.9344, 79.8428); // Near Colombo
         _isLocationLoading = false;
         _errorMessage =
-            'Using demo location. Enable location permissions for real tracking.';
+            'Location permission is required to show your location and track trucks';
+        // Use default Colombo location as fallback
+        _userLocation = const LatLng(6.9271, 79.8612);
       });
       _getRouteFromAPI();
     }
   }
 
-  Future<void> _checkLocationPermissions() async {
+  Future<bool> _requestLocationPermission() async {
     try {
+      // Check if location service is enabled
       _serviceEnabled = await location.serviceEnabled();
       if (!_serviceEnabled) {
         _serviceEnabled = await location.requestService();
         if (!_serviceEnabled) {
           setState(() {
-            _errorMessage = 'Location service is disabled';
+            _errorMessage =
+                'Location service is disabled. Please enable it in settings.';
           });
-          return;
+          return false;
         }
       }
 
+      // Request location permission
       _permissionGranted = await location.hasPermission();
       if (_permissionGranted == PermissionStatus.denied) {
         _permissionGranted = await location.requestPermission();
         if (_permissionGranted != PermissionStatus.granted) {
           setState(() {
-            _errorMessage = 'Location permission denied';
+            _errorMessage =
+                'Location permission denied. Please grant permission to see your location.';
           });
-          return;
+          return false;
         }
       }
+
+      return true;
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error checking location permissions: $e';
+        _errorMessage = 'Error requesting location permission: $e';
       });
+      return false;
     }
   }
 
-  Future<void> _getCurrentLocation() async {
+  Future<void> _getUserDeviceLocation() async {
     try {
-      _currentLocation = await location.getLocation();
-      if (_currentLocation != null) {
-        setState(() {
-          _truckLocation = LatLng(
-            _currentLocation!.latitude!,
-            _currentLocation!.longitude!,
-          );
-          _isLocationLoading = false;
-          _errorMessage = '';
-        });
-        await _getRouteFromAPI();
-      }
-    } catch (e) {
-      print('Error getting current location: $e');
-      setState(() {
-        _isLocationLoading = false;
-        _errorMessage =
-            'Using demo truck. Driver location unavailable: ${e.toString()}';
-      });
-      await _getRouteFromAPI();
-    }
-  }
+      LocationData currentLocation = await location.getLocation();
 
-  void _startLocationTracking() {
-    _locationSubscription = location.onLocationChanged.listen((
-      LocationData currentLocation,
-    ) {
       if (currentLocation.latitude != null &&
           currentLocation.longitude != null) {
         setState(() {
-          _truckLocation = LatLng(
+          _userLocation = LatLng(
             currentLocation.latitude!,
             currentLocation.longitude!,
           );
           _currentLocation = currentLocation;
         });
 
-        // Update route when truck (driver) location changes
-        _getRouteFromAPI();
+        print(
+          '✓ User location obtained: ${_userLocation!.latitude}, ${_userLocation!.longitude}',
+        );
+      }
+    } catch (e) {
+      print('Error getting user device location: $e');
+      setState(() {
+        _errorMessage = 'Could not get your location. Using default location.';
+        _userLocation = const LatLng(6.9271, 79.8612); // Fallback to Colombo
+      });
+    }
+  }
+
+  Future<void> _initializeLocation() async {
+    // User location tracking
+    if (_serviceEnabled && _permissionGranted == PermissionStatus.granted) {
+      _startLocationTracking();
+    }
+
+    setState(() {
+      _isLocationLoading = false;
+    });
+
+    // Driver location is tracked via Firebase listener
+    if (_truckLocation != null && _userLocation != null) {
+      await _getRouteFromAPI();
+    }
+  }
+
+  // Listen to driver's real-time location from Firebase
+  void _startListeningToDriverLocation() {
+    print('🚛 Starting to listen to driver locations...');
+
+    _driverLocationSubscription = FirebaseFirestore.instance
+        .collection('driver_locations')
+        .where('isOnline', isEqualTo: true) // Only get online drivers
+        .snapshots()
+        .listen(
+          (snapshot) {
+            print(
+              '📍 Driver locations update received: ${snapshot.docs.length} drivers online',
+            );
+
+            if (snapshot.docs.isNotEmpty) {
+              // Get the first online driver (in production, you'd select based on assigned driver)
+              final driverDoc = snapshot.docs.first;
+              final data = driverDoc.data();
+
+              // Extract location data with fallback to different field names
+              final double? lat = data['latitude'] ?? data['lat'];
+              final double? lng = data['longitude'] ?? data['lng'];
+
+              if (lat != null && lng != null) {
+                setState(() {
+                  _truckLocation = LatLng(lat, lng);
+                  _isDriverOnline = data['isOnline'] ?? false;
+                  _truckSpeed = (data['speed'] ?? 0.0).toDouble();
+                  _truckHeading = (data['heading'] ?? 0.0).toDouble();
+                  _driverName = data['driverName'] ?? 'Collection Truck';
+                });
+
+                print(
+                  '✓ Truck location updated: $lat, $lng - Speed: $_truckSpeed km/h - Online: $_isDriverOnline',
+                );
+
+                // Update route when truck location changes
+                if (_userLocation != null) {
+                  _getRouteFromAPI();
+                }
+              }
+            } else {
+              // No online drivers found
+              print('⚠️ No online drivers found');
+              setState(() {
+                _truckLocation = const LatLng(
+                  6.9344,
+                  79.8428,
+                ); // Fallback location
+                _isDriverOnline = false;
+                _errorMessage =
+                    'No active collection trucks found. Showing demo location.';
+              });
+            }
+          },
+          onError: (error) {
+            print('❌ Error listening to driver locations: $error');
+            setState(() {
+              _errorMessage = 'Error tracking truck: $error';
+              _truckLocation = const LatLng(6.9344, 79.8428); // Fallback
+            });
+          },
+        );
+  }
+
+  void _startLocationTracking() {
+    // Track user's device location in real-time
+    _locationSubscription = location.onLocationChanged.listen((
+      LocationData currentLocation,
+    ) {
+      if (currentLocation.latitude != null &&
+          currentLocation.longitude != null) {
+        setState(() {
+          _userLocation = LatLng(
+            currentLocation.latitude!,
+            currentLocation.longitude!,
+          );
+          _currentLocation = currentLocation;
+        });
+
+        // Update route when user location changes
+        if (_truckLocation != null) {
+          _getRouteFromAPI();
+        }
       }
     });
   }
 
   Future<void> _getRouteFromAPI() async {
-    if (_truckLocation == null) return;
+    if (_truckLocation == null || _userLocation == null) return;
 
     try {
       final String url =
           'https://maps.googleapis.com/maps/api/directions/json?'
           'origin=${_truckLocation!.latitude},${_truckLocation!.longitude}&'
-          'destination=${_userLocation.latitude},${_userLocation.longitude}&'
+          'destination=${_userLocation!.latitude},${_userLocation!.longitude}&'
           'key=$_googleMapsApiKey';
 
       final response = await http.get(Uri.parse(url));
@@ -269,7 +377,7 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
   void _setFallbackRoute() {
     if (_truckLocation != null) {
       setState(() {
-        _routeCoordinates = [_truckLocation!, _userLocation];
+        _routeCoordinates = [_truckLocation!, _userLocation!];
         _estimatedTime = _calculateEstimatedTime();
         _routeProgress = 0.7; // Demo progress
       });
@@ -286,7 +394,7 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
     if (_truckLocation == null) return 15;
 
     // Simple distance-based calculation (not accurate for real use)
-    double distance = _calculateDistance(_truckLocation!, _userLocation);
+    double distance = _calculateDistance(_truckLocation!, _userLocation!);
     return ((distance * 60) / 30).round(); // Assuming 30 km/h average speed
   }
 
@@ -334,8 +442,14 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
   Future<void> _refreshLocation() async {
     setState(() => _isRefreshing = true);
 
-    await _getCurrentLocation();
-    await _getRouteFromAPI();
+    // Refresh user location
+    await _getUserDeviceLocation();
+
+    // Driver location is automatically updated via Firebase listener
+    // Just refresh the route
+    if (_truckLocation != null && _userLocation != null) {
+      await _getRouteFromAPI();
+    }
 
     setState(() => _isRefreshing = false);
   }
@@ -383,7 +497,7 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
                 Text(
-                  'Initializing truck tracking...',
+                  'Getting your location...',
                   style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
               ],
@@ -404,6 +518,42 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          // Online status indicator
+          if (_truckLocation != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _isDriverOnline ? Colors.green : Colors.red,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _isDriverOnline ? Icons.circle : Icons.circle_outlined,
+                        color: Colors.white,
+                        size: 8,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isDriverOnline ? 'Live' : 'Offline',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             icon:
                 _isRefreshing
@@ -421,7 +571,7 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
         ],
       ),
       body:
-          _truckLocation == null
+          _userLocation == null
               ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -433,24 +583,32 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Unable to get truck location',
+                      'Location permission required',
                       style: TextStyle(
                         fontSize: 18,
+                        fontWeight: FontWeight.bold,
                         color: Colors.grey.shade600,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      _errorMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        _errorMessage.isNotEmpty
+                            ? _errorMessage
+                            : 'Please grant location permission to see your location and track trucks',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade500,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _initializeLocation,
+                    ElevatedButton.icon(
+                      onPressed: _requestLocationPermissionAndInitialize,
+                      icon: const Icon(Icons.location_on),
+                      label: const Text('Grant Location Permission'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primaryColor,
                         padding: const EdgeInsets.symmetric(
@@ -458,7 +616,6 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                           vertical: 16,
                         ),
                       ),
-                      child: const Text('Retry'),
                     ),
                   ],
                 ),
@@ -467,8 +624,8 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                 children: [
                   GoogleMap(
                     initialCameraPosition: CameraPosition(
-                      target: _truckLocation!,
-                      zoom: 13,
+                      target: _userLocation!,
+                      zoom: 14,
                     ),
                     markers: {
                       if (_truckLocation != null)
@@ -481,16 +638,16 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                                 BitmapDescriptor.hueGreen,
                               ),
                           infoWindow: InfoWindow(
-                            title: 'Clearo Collection Truck',
+                            title: _driverName,
                             snippet:
-                                'Speed: ${_getCurrentSpeed()} km/h • ETA: $_estimatedTime min',
+                                'Speed: ${_truckSpeed.round()} km/h • ETA: $_estimatedTime min ${_isDriverOnline ? "• Live" : "• Offline"}',
                           ),
-                          rotation: _currentLocation?.heading ?? 0.0,
+                          rotation: _truckHeading,
                         ),
-                      // Always show user/destination marker
+                      // User's actual device location marker
                       Marker(
                         markerId: const MarkerId('user'),
-                        position: _userLocation,
+                        position: _userLocation!,
                         icon:
                             _userIcon ??
                             BitmapDescriptor.defaultMarkerWithHue(
@@ -498,7 +655,7 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                             ),
                         infoWindow: const InfoWindow(
                           title: 'Your Location',
-                          snippet: 'Collection destination',
+                          snippet: 'Current position',
                         ),
                       ),
                     },
@@ -507,8 +664,8 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                       _mapController = controller;
                       _fitMapToShowBothLocations();
                     },
-                    myLocationEnabled: false,
-                    myLocationButtonEnabled: false,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
                     trafficEnabled: true,
                     mapType: MapType.normal,
                   ),
@@ -532,7 +689,7 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                           Colors.blue,
                           'user_location',
                           () => _mapController?.animateCamera(
-                            CameraUpdate.newLatLng(_userLocation),
+                            CameraUpdate.newLatLng(_userLocation!),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -615,30 +772,30 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
   }
 
   void _fitMapToShowBothLocations() {
-    if (_mapController == null) return;
+    if (_mapController == null || _userLocation == null) return;
 
     if (_truckLocation != null) {
       _mapController!.animateCamera(
         CameraUpdate.newLatLngBounds(
           LatLngBounds(
             southwest: LatLng(
-              (_truckLocation!.latitude < _userLocation.latitude
+              (_truckLocation!.latitude < _userLocation!.latitude
                       ? _truckLocation!.latitude
-                      : _userLocation.latitude) -
+                      : _userLocation!.latitude) -
                   0.005,
-              (_truckLocation!.longitude < _userLocation.longitude
+              (_truckLocation!.longitude < _userLocation!.longitude
                       ? _truckLocation!.longitude
-                      : _userLocation.longitude) -
+                      : _userLocation!.longitude) -
                   0.005,
             ),
             northeast: LatLng(
-              (_truckLocation!.latitude > _userLocation.latitude
+              (_truckLocation!.latitude > _userLocation!.latitude
                       ? _truckLocation!.latitude
-                      : _userLocation.latitude) +
+                      : _userLocation!.latitude) +
                   0.005,
-              (_truckLocation!.longitude > _userLocation.longitude
+              (_truckLocation!.longitude > _userLocation!.longitude
                       ? _truckLocation!.longitude
-                      : _userLocation.longitude) +
+                      : _userLocation!.longitude) +
                   0.005,
             ),
           ),
@@ -646,15 +803,15 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
         ),
       );
     } else {
-      _mapController!.animateCamera(CameraUpdate.newLatLng(_userLocation));
+      _mapController!.animateCamera(CameraUpdate.newLatLng(_userLocation!));
     }
   }
 
   String _getCurrentSpeed() {
-    if (_currentLocation?.speed != null && _currentLocation!.speed! > 0) {
-      return ((_currentLocation!.speed! * 3.6).round()).toString();
+    if (_truckSpeed > 0) {
+      return _truckSpeed.round().toString();
     }
-    return '25'; // Demo speed
+    return '0';
   }
 
   Widget _buildInfoCard() {
@@ -691,13 +848,19 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                     ),
                     Row(
                       children: [
-                        Icon(Icons.gps_fixed, color: _accentColor, size: 16),
+                        Icon(
+                          _isDriverOnline
+                              ? Icons.gps_fixed
+                              : Icons.gps_not_fixed,
+                          color: _isDriverOnline ? _accentColor : Colors.grey,
+                          size: 16,
+                        ),
                         const SizedBox(width: 4),
                         Text(
-                          'Live tracking',
+                          _isDriverOnline ? 'Live tracking' : 'Offline',
                           style: TextStyle(
                             fontSize: 12,
-                            color: _accentColor,
+                            color: _isDriverOnline ? _accentColor : Colors.grey,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -712,7 +875,10 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                   ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [_primaryColor, _accentColor],
+                      colors:
+                          _isDriverOnline
+                              ? [_primaryColor, _accentColor]
+                              : [Colors.grey.shade400, Colors.grey.shade500],
                     ),
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -732,9 +898,15 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
               children: [
                 Icon(Icons.local_shipping, color: _accentColor, size: 20),
                 const SizedBox(width: 8),
-                const Text(
-                  'Clearo Collection Truck #CR-245',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                Expanded(
+                  child: Text(
+                    _driverName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -756,9 +928,22 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
                 ),
                 Row(
                   children: [
-                    Icon(Icons.route, color: Colors.orange.shade400, size: 18),
+                    Icon(
+                      _isDriverOnline ? Icons.route : Icons.location_off,
+                      color:
+                          _isDriverOnline
+                              ? Colors.orange.shade400
+                              : Colors.grey,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
-                    Text('En route', style: const TextStyle(fontSize: 14)),
+                    Text(
+                      _isDriverOnline ? 'En route' : 'Offline',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _isDriverOnline ? Colors.black87 : Colors.grey,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -800,6 +985,7 @@ class _TruckTrackingScreenState extends State<TruckTrackingScreen> {
   @override
   void dispose() {
     _locationSubscription?.cancel();
+    _driverLocationSubscription?.cancel(); // Cancel driver location listener
     _mapController?.dispose();
     super.dispose();
   }

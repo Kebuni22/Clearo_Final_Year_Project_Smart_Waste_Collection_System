@@ -4,6 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/notification_service.dart';
 import 'dart:async';
+import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:location/location.dart' as loc;
+import 'dart:convert';
 
 class BinStatusScreen extends StatefulWidget {
   const BinStatusScreen({Key? key}) : super(key: key);
@@ -619,6 +622,12 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
         ),
         backgroundColor: const Color.fromARGB(255, 187, 221, 188),
         actions: [
+          // QR Scanner Button
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Scan Bin QR Code',
+            onPressed: () => _openQRScanner(),
+          ),
           // Auto-refresh toggle button
           IconButton(
             icon: Icon(
@@ -1487,6 +1496,80 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
                 ),
           ),
     );
+  }
+
+  void _openQRScanner() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => QRScannerScreen(
+              onQRScanned: (qrCode) {
+                _handleQRCodeScan(qrCode);
+              },
+            ),
+      ),
+    );
+  }
+
+  void _handleQRCodeScan(String qrCode) {
+    try {
+      // Parse the QR code data (assuming it's JSON format)
+      final Map<String, dynamic> qrData = json.decode(qrCode);
+
+      // Show dialog with scanned bin information
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.qr_code, color: Colors.green[600]),
+                  const SizedBox(width: 8),
+                  const Text('Bin Scanned'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Bin ID: ${qrData['binId'] ?? 'Unknown'}'),
+                  Text('Location: ${qrData['location'] ?? 'Unknown'}'),
+                  Text('Type: ${qrData['type'] ?? 'Unknown'}'),
+                  if (qrData['capacity'] != null)
+                    Text('Capacity: ${qrData['capacity']} liters'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    // Could add functionality to request emptying for this specific bin
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bin information loaded'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  child: const Text('Request Emptying'),
+                ),
+              ],
+            ),
+      );
+    } catch (e) {
+      // Handle invalid QR code format
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Invalid QR code format: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _showAddBinDialog() {
@@ -3156,4 +3239,113 @@ class _FillLevelPainter extends CustomPainter {
   @override
   bool shouldRepaint(_FillLevelPainter oldDelegate) =>
       oldDelegate.fillLevel != fillLevel || oldDelegate.fillColor != fillColor;
+}
+
+// QR Scanner Screen
+class QRScannerScreen extends StatefulWidget {
+  final Function(String) onQRScanned;
+
+  const QRScannerScreen({Key? key, required this.onQRScanned})
+    : super(key: key);
+
+  @override
+  State<QRScannerScreen> createState() => _QRScannerScreenState();
+}
+
+class _QRScannerScreenState extends State<QRScannerScreen> {
+  final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
+  QRViewController? controller;
+  bool isScanning = true;
+
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
+  }
+
+  void _onQRViewCreated(QRViewController controller) {
+    this.controller = controller;
+    controller.scannedDataStream.listen((scanData) {
+      if (isScanning && scanData.code != null) {
+        setState(() {
+          isScanning = false;
+        });
+        controller.pauseCamera();
+        Navigator.pop(context);
+        widget.onQRScanned(scanData.code!);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Scan Bin QR Code'),
+        backgroundColor: const Color.fromARGB(255, 187, 221, 188),
+        actions: [
+          IconButton(
+            icon: Icon(
+              controller?.getFlashStatus() == true
+                  ? Icons.flash_on
+                  : Icons.flash_off,
+            ),
+            onPressed: () {
+              controller?.toggleFlash();
+              setState(() {});
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            flex: 4,
+            child: QRView(
+              key: qrKey,
+              onQRViewCreated: _onQRViewCreated,
+              overlay: QrScannerOverlayShape(
+                borderColor: Colors.green,
+                borderRadius: 10,
+                borderLength: 30,
+                borderWidth: 10,
+                cutOutSize: 300,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Container(
+              color: Colors.white,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.qr_code_scanner,
+                      size: 48,
+                      color: Colors.green[600],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Position QR code within frame',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Scan the QR code printed by admin',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
