@@ -48,6 +48,7 @@ import CollectionReports from '../components/dashboard/CollectionReports';
 import UserActivity from '../components/dashboard/UserActivity';
 import RecyclingProgress from '../components/dashboard/RecyclingProgress';
 import TodayTasks from '../components/dashboard/TodayTasks';
+import ClearoBins from '../components/dashboard/ClearoBins';
 
 export default function Dashboard() {
   const [userData, setUserData] = useState(null);
@@ -409,11 +410,10 @@ export default function Dashboard() {
     {
       title: 'User Management',
       icon: <FaUsers />,
-      iconBg: 'bg-yellow-100',
-      iconColor: 'text-yellow-600',
       items: [
-        { icon: <FaUsers />, label: 'Residents', view: 'residents' },
-        { icon: <FaUserCircle />, label: 'Administration', view: 'administration' },
+        { label: 'Residents', icon: <FaUsers />, view: 'residents' },
+        { label: 'Drivers', icon: <FaTruck />, view: 'drivers' },
+        { label: 'Clea~Ro Bins', icon: <FaTrashAlt />, view: 'clearoBins' },
       ],
     },
     {
@@ -830,11 +830,10 @@ export default function Dashboard() {
     if (selectedView === 'smartBins') {
       return (
         <SmartBins
-          smartBins={smartBins}
-          smartBinsLoading={smartBinsLoading}
           smartBinSearch={smartBinSearch}
           setSmartBinSearch={setSmartBinSearch}
-          fetchSmartBins={fetchSmartBins}
+          // Remove smartBins, smartBinsLoading, and fetchSmartBins props
+          // SmartBins component now handles its own real-time data
         />
       );
     }
@@ -927,6 +926,9 @@ export default function Dashboard() {
     }
     if (selectedView === 'progress') {
       return <RecyclingProgress />;
+    }
+    if (selectedView === 'clearoBins') {
+      return <ClearoBins />;
     }
     // ...existing code for fallback...
     return (
