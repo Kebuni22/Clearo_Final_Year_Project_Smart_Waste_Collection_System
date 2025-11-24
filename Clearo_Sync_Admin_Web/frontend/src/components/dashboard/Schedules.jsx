@@ -26,6 +26,10 @@ const Schedules = () => {
     endTime: ''
   });
 
+  // Add recurring schedule state (NEW)
+  const [recurringOption, setRecurringOption] = useState('once'); // 'once', 'weekly', 'monthly'
+  const [numberOfWeeks, setNumberOfWeeks] = useState(4); // Default 4 weeks (1 month)
+
   // Road form state
   const [roadForm, setRoadForm] = useState({
     name: '',
@@ -356,29 +360,71 @@ const Schedules = () => {
 
   const handleCreateSchedule = async () => {
     try {
-      const schedulePromises = selectedRoads.map(road => {
-        const scheduleData = {
-          roadId: road.id,
-          roadName: road.name,
-          wasteType: selectedWasteType,
-          timeSlot: roadTimeSlots[road.id],
-          date: formatDate(selectedDate),
-          createdAt: new Date()
-        };
-        return addDoc(collection(db, 'schedules'), scheduleData);
-      });
+      const datesToSchedule = [];
+      
+      if (recurringOption === 'once') {
+        // Single date only
+        datesToSchedule.push(new Date(selectedDate));
+      } else if (recurringOption === 'weekly') {
+        // Same day of week for specified number of weeks
+        const baseDate = new Date(selectedDate);
+        for (let i = 0; i < numberOfWeeks; i++) {
+          const newDate = new Date(baseDate);
+          newDate.setDate(baseDate.getDate() + (i * 7));
+          datesToSchedule.push(newDate);
+        }
+      } else if (recurringOption === 'monthly') {
+        // Same day of week for every week in the next 3 months
+        const baseDate = new Date(selectedDate);
+        const dayOfWeek = baseDate.getDay();
+        const endDate = new Date(baseDate);
+        endDate.setMonth(endDate.getMonth() + 3);
+        
+        let currentDate = new Date(baseDate);
+        while (currentDate <= endDate) {
+          datesToSchedule.push(new Date(currentDate));
+          currentDate.setDate(currentDate.getDate() + 7);
+        }
+      }
 
-      await Promise.all(schedulePromises);
+      // Create schedules for all dates
+      const allSchedulePromises = [];
+      
+      for (const scheduleDate of datesToSchedule) {
+        const dateSchedulePromises = selectedRoads.map(road => {
+          const scheduleData = {
+            roadId: road.id,
+            roadName: road.name,
+            wasteType: selectedWasteType,
+            timeSlot: roadTimeSlots[road.id],
+            date: formatDate(scheduleDate),
+            recurring: recurringOption !== 'once',
+            recurringType: recurringOption,
+            createdAt: new Date()
+          };
+          return addDoc(collection(db, 'schedules'), scheduleData);
+        });
+        allSchedulePromises.push(...dateSchedulePromises);
+      }
+
+      await Promise.all(allSchedulePromises);
       await fetchSchedules();
+      
+      // Show success message
+      const totalSchedules = datesToSchedule.length * selectedRoads.length;
+      alert(`Successfully created ${totalSchedules} schedule(s) across ${datesToSchedule.length} date(s)!`);
       
       // Reset form
       setShowScheduleModal(false);
       setSelectedWasteType('');
-      setSelectedCategory(''); // reset category
+      setSelectedCategory('');
       setSelectedRoads([]);
       setRoadTimeSlots({});
+      setRecurringOption('once');
+      setNumberOfWeeks(4);
     } catch (error) {
       console.error('Error creating schedule:', error);
+      alert('Error creating schedules. Please try again.');
     }
   };
 
@@ -1736,6 +1782,8 @@ const Schedules = () => {
                   <tbody className="divide-y divide-gray-200">
                     {daySchedules.map((schedule, index) => {
                       const road = roads.find(r => r.id === schedule.roadId);
+                      const timeStatus = isToday ? getTimeSlotStatus(schedule.timeSlot, selectedCalendarDate) : (isPast ? 'completed' : 'upcoming');
+                      
                       return (
                         <tr key={schedule.id || index}>
                           <td className="px-4 py-2 text-sm text-gray-900">
@@ -1753,9 +1801,22 @@ const Schedules = () => {
                             </div>
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-900">
-                            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-200">
-                              Completed
-                            </span>
+                            {timeStatus === 'ongoing' ? (
+                              <span className="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center w-fit">
+                                <span className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
+                                Ongoing
+                              </span>
+                            ) : timeStatus === 'completed' ? (
+                              <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-200 flex items-center w-fit">
+                                <FaCheck className="mr-1" />
+                                Completed
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200 flex items-center w-fit">
+                                <FaClock className="mr-1" />
+                                Upcoming
+                              </span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -2179,13 +2240,13 @@ const Schedules = () => {
           {wasteTypes.length > 0 ? (
             <div className="p-6">
               <div className="flex flex-wrap gap-4 justify-start">
-                {wasteTypes.map((wasteType, index) => (
+                {wasteTypes.map((wasteType) => (
                   <div 
-                    key={wasteType.id || index} 
+                    key={wasteType.id || wasteType.name} 
                     className={`relative group flex items-center ${wasteType.bgColor} ${wasteType.textColor} px-6 py-4 rounded-xl border-2 border-transparent hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow-md min-w-[180px] cursor-pointer`}
                   >
                     {/* Colored Circle Indicator */}
-                    <div className={`w-5 h-5 ${wasteType.color} rounded-full mr-3 flex-shrink-0 shadow-sm`}></div>
+                    <div className={`w-5 h-5 ${wasteType.color} rounded-full mr-3 flex-shrink-0`}></div>
                     
                     {/* Waste Type Name */}
                     <div className="flex-1">
@@ -2276,7 +2337,7 @@ const Schedules = () => {
                     <div className="flex-1">
                       <h4 className="font-semibold text-base text-gray-900">{category.name}</h4>
                       <p className="text-xs text-gray-500 mt-1">
-                        {roads.filter(r => r.categoryId === category.id).length} roads
+                        {roads.filter(road => road.categoryId === category.id).length} roads
                       </p>
                     </div>
                   </div>
@@ -2289,7 +2350,7 @@ const Schedules = () => {
                     <div className="flex-1">
                       <h4 className="font-semibold text-base text-gray-700">Uncategorized</h4>
                       <p className="text-xs text-gray-500 mt-1">
-                        {roads.filter(r => !r.categoryId).length} roads
+                        {roads.filter(road => !road.categoryId).length} roads
                       </p>
                     </div>
                   </div>
@@ -2673,19 +2734,176 @@ const Schedules = () => {
                   </div>
                 )}
 
-                {/* Step 5: Schedule Summary (updated step number) */}
+                {/* Step 5: Recurring Schedule Option (NEW) */}
                 {selectedWasteType && selectedCategory && selectedRoads.length > 0 && Object.keys(roadTimeSlots).some(key => roadTimeSlots[key]) && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                       <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center mr-3 text-sm font-bold">5</div>
+                      Recurring Schedule Options
+                    </h3>
+                    <div className="bg-purple-50 rounded-xl p-6 border border-purple-200">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-3">
+                            Schedule Frequency
+                          </label>
+                          <div className="space-y-3">
+                            <label className="flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-white ${recurringOption === 'once' ? 'border-purple-500 bg-white' : 'border-gray-200'}">
+                              <input
+                                type="radio"
+                                name="recurring"
+                                value="once"
+                                checked={recurringOption === 'once'}
+                                onChange={(e) => setRecurringOption(e.target.value)}
+                                className="mr-3"
+                              />
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">One-time Schedule</div>
+                                <div className="text-sm text-gray-500">Create schedule only for {selectedDate?.toLocaleDateString()}</div>
+                              </div>
+                            </label>
+
+                            <label className="flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-white ${recurringOption === 'weekly' ? 'border-purple-500 bg-white' : 'border-gray-200'}">
+                              <input
+                                type="radio"
+                                name="recurring"
+                                value="weekly"
+                                checked={recurringOption === 'weekly'}
+                                onChange={(e) => setRecurringOption(e.target.value)}
+                                className="mr-3"
+                              />
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">Weekly Recurring</div>
+                                <div className="text-sm text-gray-500">
+                                  Repeat every {selectedDate && new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' })}
+                                </div>
+                              </div>
+                            </label>
+
+                            {recurringOption === 'weekly' && (
+                              <div className="ml-9 p-4 bg-white rounded-lg border border-purple-200">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Number of Weeks
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="52"
+                                  value={numberOfWeeks}
+                                  onChange={(e) => setNumberOfWeeks(parseInt(e.target.value) || 1)}
+                                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                />
+                                <p className="text-xs text-gray-500 mt-2">
+                                  Will create schedules for the next {numberOfWeeks} {numberOfWeeks === 1 ? 'week' : 'weeks'}
+                                </p>
+                              </div>
+                            )}
+
+                            <label className="flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-white ${recurringOption === 'monthly' ? 'border-purple-500 bg-white' : 'border-gray-200'}">
+                              <input
+                                type="radio"
+                                name="recurring"
+                                value="monthly"
+                                checked={recurringOption === 'monthly'}
+                                onChange={(e) => setRecurringOption(e.target.value)}
+                                className="mr-3"
+                              />
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">Monthly Recurring (3 Months)</div>
+                                <div className="text-sm text-gray-500">
+                                  Repeat every {selectedDate && new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' })} for the next 3 months
+                                </div>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Preview of dates */}
+                        {(recurringOption === 'weekly' || recurringOption === 'monthly') && (
+                          <div className="p-4 bg-white rounded-lg border border-purple-200">
+                            <h4 className="font-semibold text-purple-800 mb-2">Schedule Preview</h4>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {(() => {
+                                const previewDates = [];
+                                if (recurringOption === 'weekly') {
+                                  const baseDate = new Date(selectedDate);
+                                  for (let i = 0; i < numberOfWeeks; i++) {
+                                    const newDate = new Date(baseDate);
+                                    newDate.setDate(baseDate.getDate() + (i * 7));
+                                    previewDates.push(newDate);
+                                  }
+                                } else if (recurringOption === 'monthly') {
+                                  const baseDate = new Date(selectedDate);
+                                  const endDate = new Date(baseDate);
+                                  endDate.setMonth(endDate.getMonth() + 3);
+                                  let currentDate = new Date(baseDate);
+                                  while (currentDate <= endDate) {
+                                    previewDates.push(new Date(currentDate));
+                                    currentDate.setDate(currentDate.getDate() + 7);
+                                  }
+                                }
+                                
+                                return previewDates.map((date, idx) => (
+                                  <div key={idx} className="text-sm text-gray-700 flex items-center">
+                                    <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
+                                    {date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                            <p className="text-xs text-purple-600 mt-2 font-medium">
+                              Total: {recurringOption === 'weekly' ? numberOfWeeks : (() => {
+                                const baseDate = new Date(selectedDate);
+                                const endDate = new Date(baseDate);
+                                endDate.setMonth(endDate.getMonth() + 3);
+                                let count = 0;
+                                let currentDate = new Date(baseDate);
+                                while (currentDate <= endDate) {
+                                  count++;
+                                  currentDate.setDate(currentDate.getDate() + 7);
+                                }
+                                return count;
+                              })()} dates × {selectedRoads.length} roads = {(recurringOption === 'weekly' ? numberOfWeeks : (() => {
+                                const baseDate = new Date(selectedDate);
+                                const endDate = new Date(baseDate);
+                                endDate.setMonth(endDate.getMonth() + 3);
+                                let count = 0;
+                                let currentDate = new Date(baseDate);
+                                while (currentDate <= endDate) {
+                                  count++;
+                                  currentDate.setDate(currentDate.getDate() + 7);
+                                }
+                                return count;
+                              })()) * selectedRoads.length} schedules
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 6: Schedule Summary (updated step number) */}
+                {selectedWasteType && selectedCategory && selectedRoads.length > 0 && Object.keys(roadTimeSlots).some(key => roadTimeSlots[key]) && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center mr-3 text-sm font-bold">6</div>
                       Schedule Summary
                     </h3>
                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-gray-700">Date:</span>
+                            <span className="font-medium text-gray-700">Starting Date:</span>
                             <span className="text-gray-900">{selectedDate?.toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-gray-700">Frequency:</span>
+                            <span className="text-gray-900 font-semibold">
+                              {recurringOption === 'once' ? 'One-time' : 
+                               recurringOption === 'weekly' ? `Weekly (${numberOfWeeks} weeks)` : 
+                               'Monthly (3 months)'}
+                            </span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="font-medium text-gray-700">Waste Type:</span>
@@ -2746,7 +2964,7 @@ const Schedules = () => {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowScheduleModal(false)}
-                  className="px-6 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="px-6 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -3243,13 +3461,13 @@ const Schedules = () => {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowReportModal(false)}
-                  className="px-6 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  className="px-6 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDownloadPDF}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
                 >
                   <FaSave className="mr-2" />
                   Download PDF
@@ -3342,6 +3560,14 @@ const Schedules = () => {
                               <td className="px-4 py-2 text-sm text-gray-900">{count}</td>
                             </tr>
                           ))}
+
+                          {/* New row for total collections */}
+                          <tr className="font-semibold bg-gray-50">
+                            <td className="px-4 py-2 text-sm text-gray-900">Total</td>
+                            <td className="px-4 py-2 text-sm text-gray-900">
+                              {weeklyReportData.statistics.totalRoutes}
+                            </td>
+                          </tr>
                       </tbody>
                     </table>
                   </div>
@@ -3372,6 +3598,14 @@ const Schedules = () => {
                               <td className="px-4 py-2 text-sm text-gray-900">{count}</td>
                             </tr>
                           ))}
+
+                          {/* New row for total collections */}
+                          <tr className="font-semibold bg-gray-50">
+                            <td className="px-4 py-2 text-sm text-gray-900">Total</td>
+                            <td className="px-4 py-2 text-sm text-gray-900">
+                              {Object.values(weeklyReportData.statistics.roadStats).reduce((a, b) => a + b, 0)}
+                            </td>
+                          </tr>
                       </tbody>
                     </table>
                   </div>
