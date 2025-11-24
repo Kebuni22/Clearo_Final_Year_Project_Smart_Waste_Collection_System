@@ -42,8 +42,9 @@ dependencies:
   image: ^3.2.0 # Add this line to include the image package
   http: ^1.1.0
   location: ^5.0.3
-  qr_code_scanner: ^1.0.1
   permission_handler: ^11.0.1
+  mobile_scanner: ^3.5.2  # Use this instead of qr_code_scanner
+
 
 dev_dependencies:
   flutter_test:
