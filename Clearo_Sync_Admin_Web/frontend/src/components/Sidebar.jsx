@@ -17,9 +17,33 @@ import {
   FaChevronDown,
   FaChevronRight,
   FaSignOutAlt,
+  FaUserShield,
 } from 'react-icons/fa';
 
 export default function Sidebar({ navCategories, expandedCategory, toggleCategory, setSelectedView, logout, userData }) {
+  // Add Administration to User Management if not present
+  const categories = React.useMemo(() => {
+    if (!navCategories) return [];
+    
+    return navCategories.map(category => {
+      if (category.title === 'User Management') {
+        // Check if Administration already exists
+        const hasAdministration = category.items.some(item => item.label === 'Administration');
+        
+        if (!hasAdministration) {
+          return {
+            ...category,
+            items: [
+              ...category.items,
+              { icon: <FaUserShield />, label: 'Administration', view: 'administration' }
+            ]
+          };
+        }
+      }
+      return category;
+    });
+  }, [navCategories]);
+
   return (
     <aside
       className="fixed lg:relative inset-y-0 left-0 z-10 w-80 transition-transform duration-300 ease-in-out bg-white/90 backdrop-blur-lg shadow-2xl lg:translate-x-0 overflow-y-auto flex flex-col"
@@ -59,7 +83,7 @@ export default function Sidebar({ navCategories, expandedCategory, toggleCategor
       {/* Navigation - Collapsible */}
       <nav className="p-4 flex-grow bg-gradient-to-b from-green-50 to-white">
         <ul className="space-y-2">
-          {navCategories.map((category, idx) => (
+          {categories.map((category, idx) => (
             <li key={idx} className="mb-1">
               {/* Main category button */}
               <button

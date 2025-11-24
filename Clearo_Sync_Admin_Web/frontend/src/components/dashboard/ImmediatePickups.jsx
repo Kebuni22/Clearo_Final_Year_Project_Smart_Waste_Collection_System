@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FaTruck, 
   FaClock, 
@@ -17,7 +17,7 @@ import {
   FaSearch,
   FaSort
 } from 'react-icons/fa';
-import { doc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, collection, getDocs, addDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
 const ImmediatePickups = ({
@@ -36,6 +36,7 @@ const ImmediatePickups = ({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showAssignDriverModal, setShowAssignDriverModal] = useState(false);
   const [showEditStatusModal, setShowEditStatusModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   
   // Driver assignment states
   const [drivers, setDrivers] = useState([]);
@@ -45,6 +46,10 @@ const ImmediatePickups = ({
   // Status editing states
   const [editingStatus, setEditingStatus] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  
+  // Cancellation states
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   
   // Notification state
   const [notification, setNotification] = useState(null);
@@ -114,6 +119,21 @@ const ImmediatePickups = ({
     }
   }, [immediatePickups]);
 
+  // Fetch confirmed pickups from DB
+  const fetchConfirmedPickups = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'confirmedPickups'));
+      setConfirmedPickups(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (err) {
+      console.error('Error fetching confirmed pickups:', err);
+    }
+  };
+
+  // Fetch confirmed/completed pickups on mount
+  useEffect(() => {
+    fetchConfirmedPickups();
+  }, []);
+
   // Helper function to determine actual payment status based on payment method
   const getActualPaymentStatus = (pickup) => {
     const paymentMethod = pickup.paymentMethod?.toLowerCase();
@@ -171,51 +191,86 @@ const ImmediatePickups = ({
     return 'Time not specified';
   };
 
-  // Filter and sort immediate pickups
-  const filteredPickups = immediatePickups
-    .filter(pickup => {
-      const binsText = getBinsDisplay(pickup).toLowerCase();
-      const customerInfo = getCustomerInfo(pickup);
-      
-      const matchesSearch = binsText.includes(searchTerm.toLowerCase()) ||
-                           customerInfo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           pickup.userId?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'All' || pickup.status === statusFilter;
-      
-      // Determine actual payment status based on payment method
-      const actualPaymentStatus = getActualPaymentStatus(pickup);
-      const matchesPayment = paymentFilter === 'All' || actualPaymentStatus === paymentFilter;
-      
-      return matchesSearch && matchesStatus && matchesPayment;
-    })
-    .sort((a, b) => {
-      let aValue, bValue;
-      
-      switch (sortBy) {
-        case 'timestamp':
-          aValue = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
-          bValue = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
-          break;
-        case 'customerName':
-          aValue = getCustomerInfo(a).name;
-          bValue = getCustomerInfo(b).name;
-          break;
-        case 'totalAmount':
-          aValue = parseFloat(a.totalAmount) || 0;
-          bValue = parseFloat(b.totalAmount) || 0;
-          break;
-        default:
-          aValue = a[sortBy] || '';
-          bValue = b[sortBy] || '';
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
+  // NEW: Use useMemo for activePickups to ensure correct filtering on refresh
+  const activePickups = useMemo(() => {
+    return immediatePickups
+      .filter(pickup => {
+        // Check if pickup time has passed
+        const isTimePassed = (() => {
+          if (pickup.pickupDate && pickup.pickupTime) {
+            const pickupDateTime = new Date(`${pickup.pickupDate} ${pickup.pickupTime}`);
+            return pickupDateTime < new Date();
+          }
+          return false;
+        })();
+
+        // Active pickups: not completed, not cancelled, and time hasn't passed
+        return pickup.status !== 'Completed' && 
+               pickup.status !== 'Cancelled' && 
+               !isTimePassed;
+      })
+      .filter(pickup => {
+        const binsText = getBinsDisplay(pickup).toLowerCase();
+        const customerInfo = getCustomerInfo(pickup);
+        
+        const matchesSearch = binsText.includes(searchTerm.toLowerCase()) ||
+                             customerInfo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             pickup.userId?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesStatus = statusFilter === 'All' || pickup.status === statusFilter;
+        const actualPaymentStatus = getActualPaymentStatus(pickup);
+        const matchesPayment = paymentFilter === 'All' || actualPaymentStatus === paymentFilter;
+        
+        return matchesSearch && matchesStatus && matchesPayment;
+      })
+      .sort((a, b) => {
+        let aValue, bValue;
+        switch (sortBy) {
+          case 'timestamp':
+            aValue = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp || 0);
+            bValue = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp || 0);
+            break;
+          case 'customerName':
+            aValue = getCustomerInfo(a).name;
+            bValue = getCustomerInfo(b).name;
+            break;
+          case 'totalAmount':
+            aValue = parseFloat(a.totalAmount) || 0;
+            bValue = parseFloat(b.totalAmount) || 0;
+            break;
+          default:
+            aValue = a[sortBy] || '';
+            bValue = b[sortBy] || '';
+        }
+        
+        if (sortOrder === 'asc') {
+          return aValue > bValue ? 1 : -1;
+        } else {
+          return aValue < bValue ? 1 : -1;
+        }
+      });
+  }, [immediatePickups, searchTerm, statusFilter, paymentFilter, sortBy, sortOrder]);
+
+  // Combine completed pickups from the same collection
+  const allCompletedPickups = useMemo(() => {
+    return immediatePickups.filter(pickup => {
+      const isTimePassed = (() => {
+        if (pickup.pickupDate && pickup.pickupTime) {
+          const pickupDateTime = new Date(`${pickup.pickupDate} ${pickup.pickupTime}`);
+          return pickupDateTime < new Date();
+        }
+        return false;
+      })();
+      return pickup.status === 'Completed' || 
+             pickup.status === 'Cancelled' || 
+             (isTimePassed && pickup.status !== 'Cancelled');
+    }).sort((a, b) => {
+      // Sort by completedAt or cancelledAt descending
+      const aTime = a.completedAt || a.cancelledAt || new Date(0);
+      const bTime = b.completedAt || b.cancelledAt || new Date(0);
+      return bTime - aTime;
     });
+  }, [immediatePickups]);
 
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
@@ -322,30 +377,36 @@ const ImmediatePickups = ({
     setShowDetailModal(true);
   };
 
+  // Confirm Pickup: update status, save to confirmedPickups collection, then open assign driver modal
   const handleConfirmPickup = async () => {
     if (!selectedPickup) {
       showNotification('No pickup selected', 'error');
       return;
     }
-    
     try {
       setLoading(true);
-      console.log('Confirming pickup:', selectedPickup.id);
-      
-      const pickupRef = doc(db, 'immediatePickups', selectedPickup.id);
+      const pickupRef = doc(db, 'immediate_pickups', selectedPickup.id);
       await updateDoc(pickupRef, {
         status: 'Confirmed',
         confirmedAt: new Date(),
         confirmedBy: 'Admin'
       });
-      
+      // Save to confirmedPickups collection
+      await setDoc(doc(db, 'confirmedPickups', selectedPickup.id), {
+        ...selectedPickup,
+        status: 'Confirmed',
+        confirmedAt: new Date(),
+        confirmedBy: 'Admin'
+      });
       showNotification(`Pickup confirmed successfully!`, 'success');
       setShowConfirmModal(false);
       setSelectedPickup(null);
-      
-      if (onRefresh) {
-        await onRefresh();
-      }
+      await fetchConfirmedPickups();
+      if (onRefresh) await onRefresh();
+      // Immediately open assign driver modal for this pickup
+      setTimeout(() => {
+        openAssignDriverModal({ ...selectedPickup, status: 'Confirmed' });
+      }, 300);
     } catch (error) {
       console.error('Error confirming pickup:', error);
       showNotification(`Error confirming pickup: ${error.message}`, 'error');
@@ -354,37 +415,39 @@ const ImmediatePickups = ({
     }
   };
 
+  // Assign Driver: update status, save driver assignment
   const handleAssignDriver = async () => {
     if (!selectedPickup) {
       showNotification('No pickup selected', 'error');
       return;
     }
-    
     if (!selectedDriver) {
       showNotification('Please select a driver', 'error');
       return;
     }
-    
     try {
       setAssigningDriver(true);
-      console.log('Assigning driver:', selectedDriver, 'to pickup:', selectedPickup.id);
-      
-      const pickupRef = doc(db, 'immediatePickups', selectedPickup.id);
+      const pickupRef = doc(db, 'immediate_pickups', selectedPickup.id);
       await updateDoc(pickupRef, {
         status: 'Assigned',
         assignedDriver: selectedDriver,
         assignedAt: new Date(),
         assignedBy: 'Admin'
       });
-      
+      // Update in confirmedPickups as well
+      await setDoc(doc(db, 'confirmedPickups', selectedPickup.id), {
+        ...selectedPickup,
+        status: 'Assigned',
+        assignedDriver: selectedDriver,
+        assignedAt: new Date(),
+        assignedBy: 'Admin'
+      });
       showNotification(`Driver ${selectedDriver} assigned successfully!`, 'success');
       setShowAssignDriverModal(false);
       setSelectedDriver('');
       setSelectedPickup(null);
-      
-      if (onRefresh) {
-        await onRefresh();
-      }
+      await fetchConfirmedPickups();
+      if (onRefresh) await onRefresh();
     } catch (error) {
       console.error('Error assigning driver:', error);
       showNotification(`Error assigning driver: ${error.message}`, 'error');
@@ -393,36 +456,40 @@ const ImmediatePickups = ({
     }
   };
 
+  // Update Status: update status in immediate_pickups collection, no deletion
   const handleUpdateStatus = async () => {
     if (!selectedPickup) {
       showNotification('No pickup selected', 'error');
       return;
     }
-    
     if (!editingStatus || editingStatus.trim() === '') {
       showNotification('Please select a status', 'error');
       return;
     }
-    
     try {
       setUpdatingStatus(true);
-      console.log('Updating status to:', editingStatus, 'for pickup:', selectedPickup.id);
-      
-      const pickupRef = doc(db, 'immediatePickups', selectedPickup.id);
+      const pickupRef = doc(db, 'immediate_pickups', selectedPickup.id);
       await updateDoc(pickupRef, {
+        status: editingStatus,
+        lastUpdated: new Date(),
+        updatedBy: 'Admin',
+        ...(editingStatus === 'Completed' && { completedAt: new Date(), completedBy: 'Admin' }),
+        ...(editingStatus === 'Cancelled' && { cancelledAt: new Date(), cancelledBy: 'Admin', cancellationReason: cancelReason, refundStatus: 'Pending' })
+      });
+      // Update in confirmedPickups as well
+      await setDoc(doc(db, 'confirmedPickups', selectedPickup.id), {
+        ...selectedPickup,
         status: editingStatus,
         lastUpdated: new Date(),
         updatedBy: 'Admin'
       });
-      
       showNotification(`Status updated to ${editingStatus} successfully!`, 'success');
       setShowEditStatusModal(false);
       setEditingStatus('');
       setSelectedPickup(null);
-      
-      if (onRefresh) {
-        await onRefresh();
-      }
+      await fetchConfirmedPickups();
+      if (onRefresh) await onRefresh();
+      // REMOVED: Deletion and local removal, as we keep in one collection
     } catch (error) {
       console.error('Error updating status:', error);
       showNotification(`Error updating status: ${error.message}`, 'error');
@@ -467,14 +534,56 @@ const ImmediatePickups = ({
     }
   };
 
+  const openCancelModal = (pickup) => {
+    setSelectedPickup(pickup);
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
   const closeAllModals = () => {
     setShowDetailModal(false);
     setShowConfirmModal(false);
     setShowAssignDriverModal(false);
     setShowEditStatusModal(false);
+    setShowCancelModal(false);
     setSelectedPickup(null);
     setSelectedDriver('');
     setEditingStatus('');
+  };
+
+  const handleCancelPickup = async () => {
+    if (!selectedPickup) {
+      showNotification('No pickup selected', 'error');
+      return;
+    }
+    if (!cancelReason.trim()) {
+      showNotification('Please provide a cancellation reason', 'error');
+      return;
+    }
+    try {
+      setCancelling(true);
+      const pickupRef = doc(db, 'immediate_pickups', selectedPickup.id);
+      await updateDoc(pickupRef, {
+        status: 'Cancelled',
+        cancelledAt: new Date(),
+        cancelledBy: 'Admin',
+        cancellationReason: cancelReason,
+        refundStatus: 'Pending',
+        lastUpdated: new Date(),
+        updatedBy: 'Admin'
+      });
+      showNotification('Pickup cancelled successfully!', 'success');
+      setShowCancelModal(false);
+      setCancelReason('');
+      setSelectedPickup(null);
+      if (onRefresh) await onRefresh();
+      // REMOVED: Deletion and local removal, as we keep in one collection
+    } catch (error) {
+      console.error('Error cancelling pickup:', error);
+      showNotification(`Error cancelling pickup: ${error.message}`, 'error');
+    } finally {
+      setCancelling(false);
+    }
   };
 
   return (
@@ -508,7 +617,7 @@ const ImmediatePickups = ({
             <p className="text-gray-600 mt-2">Manage urgent waste collection requests</p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-orange-600">{filteredPickups.length}</div>
+            <div className="text-2xl font-bold text-orange-600">{activePickups.length}</div>
             <div className="text-sm text-gray-500">Active Pickups</div>
           </div>
         </div>
@@ -537,6 +646,7 @@ const ImmediatePickups = ({
             >
               <option value="All">All Status</option>
               <option value="Pending">Pending</option>
+              <option value="Pending – No driver available">Pending – No driver available</option>
               <option value="Confirmed">Confirmed</option>
               <option value="Assigned">Assigned</option>
               <option value="Completed">Completed</option>
@@ -578,70 +688,48 @@ const ImmediatePickups = ({
         </div>
       </div>
 
-      {/* Pickups Table */}
-      {filteredPickups.length > 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* Immediate Pickup Requests Table */}
+      <div className="mt-8">
+        <h3 className="text-xl font-bold text-orange-700 mb-4 flex items-center">
+          <FaTruck className="mr-2" /> Immediate Pickup Requests
+        </h3>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto shadow-sm">
           <table className="min-w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gradient-to-r from-orange-50 to-orange-100">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Customer</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Bins</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Amount</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Pickup Time</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPickups.map((pickup, index) => {
+              {activePickups.length > 0 ? activePickups.map((pickup) => {
                 const customerInfo = getCustomerInfo(pickup);
                 return (
-                  <tr key={pickup.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
-                          <span className="text-orange-700 font-bold text-xs">#{index + 1}</span>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {formatDate(pickup)}
-                        </div>
-                      </div>
+                  <tr key={pickup.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{customerInfo.name}</div>
                     </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {customerInfo.name}
+                    <td className="px-4 py-3 text-sm text-gray-700">{getBinsDisplay(pickup)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-green-600">Rs. {pickup.totalAmount || '0.00'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {pickup.pickupDate && pickup.pickupTime ? (
+                        <div>
+                          <div>{pickup.pickupDate}</div>
+                          <div className="text-xs text-gray-500">{pickup.pickupTime}</div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {getBinsDisplay(pickup)}
-                        </div>
-                      </div>
+                      ) : 'ASAP'}
                     </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        Rs. {pickup.totalAmount || '0.00'}
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(pickup.status)}`}>
+                    <td className="px-4 py-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(pickup.status)}`}>
                         {pickup.status || 'Pending'}
                       </span>
                     </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center space-x-3">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center space-x-2">
                         <button
                           onClick={() => handleViewDetails(pickup)}
                           className="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200 transition-colors"
@@ -649,7 +737,6 @@ const ImmediatePickups = ({
                         >
                           <FaEye />
                         </button>
-
                         {pickup.status === 'Pending' && (
                           <button
                             onClick={() => openConfirmModal(pickup)}
@@ -660,7 +747,6 @@ const ImmediatePickups = ({
                             <FaCheck />
                           </button>
                         )}
-
                         {pickup.status === 'Confirmed' && (
                           <button
                             onClick={() => openAssignDriverModal(pickup)}
@@ -671,7 +757,6 @@ const ImmediatePickups = ({
                             <FaTruck />
                           </button>
                         )}
-
                         <button
                           onClick={() => openEditStatusModal(pickup)}
                           className="bg-yellow-100 text-yellow-600 p-2 rounded-lg hover:bg-yellow-200 transition-colors"
@@ -680,25 +765,97 @@ const ImmediatePickups = ({
                         >
                           <FaEdit />
                         </button>
+                        <button
+                          onClick={() => openCancelModal(pickup)}
+                          className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200 transition-colors"
+                          title="Cancel Pickup"
+                        >
+                          <FaTimes />
+                        </button>
                       </div>
                     </td>
                   </tr>
                 );
-              })}
+              }) : (
+                <tr>
+                  <td colSpan={6} className="text-center py-12">
+                    <FaTruck className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                    <p className="text-gray-500 font-medium">No active pickup requests</p>
+                    <p className="text-gray-400 text-sm mt-1">All pickups are completed or cancelled</p>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-      ) : (
-        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-          <FaTruck className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No immediate pickups</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {searchTerm || statusFilter !== 'All' || paymentFilter !== 'All'
-              ? 'Try adjusting your search or filter criteria.'
-              : 'No immediate pickup requests have been submitted yet.'}
-          </p>
+      </div>
+
+      {/* Completed Pickups Table */}
+      <div className="mt-12">
+        <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center">
+          <FaCheckCircle className="mr-2" /> Completed & Cancelled Pickups
+        </h3>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto shadow-sm">
+          <table className="min-w-full">
+            <thead className="bg-gradient-to-r from-green-50 to-green-100">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Customer</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Bins</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Amount</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Driver</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Completed At</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Refund</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {allCompletedPickups.length > 0 ? allCompletedPickups.map((pickup) => (
+                <tr key={pickup.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-900">{pickup.customerName || pickup.userName || getCustomerInfo(pickup).name}</div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{getBinsDisplay(pickup)}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-green-600">Rs. {pickup.totalAmount || '0.00'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{pickup.assignedDriver || '-'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(pickup.status)}`}>
+                      {pickup.status === 'Cancelled' ? '❌ Cancelled' : '✓ Completed'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {pickup.completedAt ? (
+                      pickup.completedAt.toDate ? pickup.completedAt.toDate().toLocaleString() : new Date(pickup.completedAt).toLocaleString()
+                    ) : pickup.cancelledAt ? (
+                      pickup.cancelledAt.toDate ? pickup.cancelledAt.toDate().toLocaleString() : new Date(pickup.cancelledAt).toLocaleString()
+                    ) : '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {pickup.status === 'Cancelled' ? (
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                        pickup.refundStatus === 'Completed' ? 'bg-green-100 text-green-800' :
+                        pickup.refundStatus === 'Processing' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {pickup.refundStatus || 'Pending'}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">N/A</span>
+                    )}
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={7} className="text-center py-12">
+                    <FaCheckCircle className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                    <p className="text-gray-500 font-medium">No completed pickups yet</p>
+                    <p className="text-gray-400 text-sm mt-1">Completed and cancelled pickups will appear here</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
       {/* Enhanced Detail Modal */}
       {showDetailModal && selectedPickup && (
@@ -1089,6 +1246,7 @@ const ImmediatePickups = ({
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 >
                   <option value="Pending">Pending</option>
+                  <option value="Pending – No driver available">Pending – No driver available</option>
                   <option value="Confirmed">Confirmed</option>
                   <option value="Assigned">Assigned</option>
                   <option value="Completed">Completed</option>
@@ -1122,6 +1280,75 @@ const ImmediatePickups = ({
                     <>
                       <FaEdit className="mr-2" />
                       Update Status
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Pickup Modal */}
+      {showCancelModal && selectedPickup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                  <FaTimes className="text-red-600 text-xl" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">Cancel Pickup</h3>
+              </div>
+              
+              <div className="mb-4">
+                <p className="text-gray-600 mb-2">Pickup ID: <strong>{selectedPickup.id}</strong></p>
+                <p className="text-gray-600 mb-2">Customer: <strong>{getCustomerInfo(selectedPickup).name}</strong></p>
+                <p className="text-gray-600 mb-4">Amount: <strong>Rs. {selectedPickup.totalAmount}</strong></p>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <p className="text-yellow-800 text-sm">⚠️ Customer will receive a refund for this cancellation.</p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cancellation Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  rows="3"
+                  placeholder="Enter reason for cancellation..."
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setCancelReason('');
+                    setSelectedPickup(null);
+                  }}
+                  className="px-6 py-3 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  disabled={cancelling}
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleCancelPickup}
+                  disabled={cancelling || !cancelReason.trim()}
+                  className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {cancelling ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Cancelling...
+                    </>
+                  ) : (
+                    <>
+                      <FaTimes className="mr-2" />
+                      Cancel Pickup
                     </>
                   )}
                 </button>
