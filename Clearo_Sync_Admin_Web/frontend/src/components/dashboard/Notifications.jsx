@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaExclamationTriangle, FaInfoCircle, FaCheckCircle, FaTrash, FaSync } from 'react-icons/fa';
 import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -8,6 +8,113 @@ const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const prevNotificationsRef = useRef([]);
+  const audioRef = useRef(null);
+
+  // Initialize audio
+  useEffect(() => {
+    // Create audio element for notification sound
+    audioRef.current = new Audio('/notification-sound.mp3');
+    audioRef.current.volume = 0.7;
+    audioRef.current.preload = 'auto';
+
+    // Test load the audio file
+    audioRef.current.addEventListener('canplaythrough', () => {
+      console.log('✅ Notification sound loaded successfully');
+    });
+
+    // Fallback: Use Web Audio API to generate beep sound if file not found
+    audioRef.current.onerror = (e) => {
+      console.warn('⚠️ Audio file not found, using Web Audio API fallback');
+    };
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  // Function to play notification sound
+  const playNotificationSound = () => {
+    if (!soundEnabled) {
+      console.log('🔇 Sound is disabled');
+      return;
+    }
+
+    try {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch(err => {
+          console.log('Audio play failed:', err);
+          // Fallback to system beep
+          playSystemBeep();
+        });
+      } else {
+        playSystemBeep();
+      }
+    } catch (err) {
+      console.error('Error playing sound:', err);
+      playSystemBeep();
+    }
+  };
+
+  // Fallback system beep using Web Audio API
+  const playSystemBeep = () => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (err) {
+      console.error('Web Audio API failed:', err);
+    }
+  };
+
+  // Test sound function
+  const testSound = () => {
+    console.log('🔊 Testing notification sound...');
+    playNotificationSound();
+    showBrowserNotification({
+      id: 'test',
+      message: 'This is a test notification with sound!',
+      title: 'Test Notification'
+    });
+  };
+
+  // Show browser notification
+  const showBrowserNotification = (notification) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('🚨 Urgent Request - Clearo', {
+        body: notification.message,
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        tag: notification.id,
+        requireInteraction: true,
+        vibrate: [200, 100, 200]
+      });
+    }
+  };
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Fetch notifications from Firestore with real-time updates
   useEffect(() => {
@@ -54,11 +161,67 @@ const Notifications = () => {
               issueCategory: data.issueCategory || '',
               isUrgent: data.isUrgent || false,
               isAdminNotification: data.isAdminNotification || false,
+              isImmediate: data.isImmediate || false,
+              isAchievement: data.isAchievement || false,
+              achievementType: data.achievementType || '',
+              priority: data.priority || 'normal',
+              // Check if it's a pickup request
+              isPickupRequest: data.type === 'pickup_request' || data.issueCategory === 'Pickup Request',
               ...data
             };
+          })
+          // ✅ FILTER: Only show admin-related notifications
+          .filter(notification => {
+            // Exclude resident achievement notifications
+            if (notification.isAchievement && notification.achievementType === 'top_contributor') {
+              return false; // Don't show resident achievements in admin panel
+            }
+            
+            // Show these types of notifications:
+            // 1. Admin notifications (isAdminNotification = true)
+            // 2. New issues reported by residents
+            // 3. Pickup requests
+            // 4. Urgent/immediate requests
+            // 5. Issue replies
+            return (
+              notification.isAdminNotification === true ||
+              notification.type === 'new_issue' ||
+              notification.type === 'pickup_request' ||
+              notification.isPickupRequest ||
+              notification.isUrgent ||
+              notification.isImmediate ||
+              notification.type === 'issue_reply'
+            );
           });
 
-          // Filter to show all notifications (both admin and user-specific)
+          // Check for new urgent/immediate notifications
+          if (prevNotificationsRef.current.length > 0) {
+            const newNotifications = notificationsData.filter(newNotif => 
+              !prevNotificationsRef.current.some(oldNotif => oldNotif.id === newNotif.id)
+            );
+
+            // Play sound for: urgent, immediate, admin notifications (new issues), and pickup requests
+            newNotifications.forEach(notification => {
+              const shouldPlaySound = 
+                notification.isUrgent || 
+                notification.isImmediate || 
+                notification.priority === 'urgent' ||
+                notification.isAdminNotification || // New issue reported
+                notification.isPickupRequest; // Pickup request
+              
+              if (shouldPlaySound) {
+                console.log('🚨 New admin notification detected:', notification.title);
+                console.log('Type:', notification.type, '| Category:', notification.issueCategory);
+                playNotificationSound();
+                showBrowserNotification(notification);
+              }
+            });
+          }
+
+          // Update refs
+          prevNotificationsRef.current = notificationsData;
+          
+          // Set notifications (already filtered for admin)
           setNotifications(notificationsData);
           setLoading(false);
         },
@@ -76,7 +239,7 @@ const Notifications = () => {
       setError('Failed to set up notifications: ' + err.message);
       setLoading(false);
     }
-  }, []);
+  }, [soundEnabled]); // Added soundEnabled as dependency
 
   // Get time ago string
   const getTimeAgo = (date) => {
@@ -161,6 +324,8 @@ const Notifications = () => {
       case 'success':
       case 'resolved':
         return `bg-green-50 border-green-200 ${baseColor}`;
+      case 'immediate':
+        return `bg-orange-50 border-orange-200 ${baseColor} animate-pulse`;
       default:
         return `bg-blue-50 border-blue-200 ${baseColor}`;
     }
@@ -196,11 +361,28 @@ const Notifications = () => {
             <p className="text-gray-600">You have {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center space-x-2 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-sm text-green-700 font-medium">Live updates</span>
-          </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-colors ${
+              soundEnabled 
+                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
+                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <div className={`w-2 h-2 rounded-full ${soundEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+            <span className="text-sm font-medium">{soundEnabled ? '🔊 Sound ON' : '🔇 Sound OFF'}</span>
+          </button>
+          
+          <button
+            onClick={testSound}
+            className="flex items-center space-x-2 px-3 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+            title="Test notification sound"
+          >
+            <FaBell className="text-sm" />
+            <span className="text-sm font-medium">Test Sound</span>
+          </button>
+
           {unreadCount > 0 && (
             <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-semibold">
               {unreadCount} New
@@ -278,9 +460,9 @@ const Notifications = () => {
                       {!notification.read && (
                         <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
                       )}
-                      {notification.isUrgent && (
-                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full border border-red-300">
-                          URGENT
+                      {(notification.isUrgent || notification.isImmediate) && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full border border-red-300 animate-pulse">
+                          🚨 {notification.isImmediate ? 'IMMEDIATE' : 'URGENT'}
                         </span>
                       )}
                     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaChartBar, FaDownload, FaCalendarAlt, FaTruck, FaRecycle, FaSync, FaRoad, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaChartBar, FaDownload, FaCalendarAlt, FaTruck, FaRecycle, FaSync, FaRoad, FaMapMarkerAlt, FaFilePdf } from 'react-icons/fa';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
@@ -305,58 +305,258 @@ const CollectionReports = () => {
     alert(`Generated report for ${startDate} to ${endDate}\nFound ${filteredCollections.length} collections`);
   };
 
-  // Export to CSV with clean data
-  const handleExportCSV = () => {
-    const headers = ['Date', 'Total Collections', 'Scheduled', 'Status'];
-    const rows = reports.map(report => [
-      report.date,
-      report.collections,
-      report.scheduledCollections,
-      report.status
-    ]);
+  // Export to PDF
+  const handleExportPDF = () => {
+    if (reports.length === 0) {
+      alert('No reports to export');
+      return;
+    }
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    // Create PDF content
+    const printWindow = window.open('', '_blank');
     
-    link.setAttribute('href', url);
-    link.setAttribute('download', `collection_reports_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Collection Reports - ${new Date().toISOString().split('T')[0]}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #16a34a;
+            padding-bottom: 20px;
+          }
+          .header h1 {
+            color: #16a34a;
+            margin: 0;
+            font-size: 32px;
+          }
+          .header p {
+            color: #666;
+            margin: 10px 0 0 0;
+          }
+          .summary {
+            background: #f0fdf4;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+          }
+          .summary h2 {
+            color: #16a34a;
+            margin-top: 0;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+          }
+          th {
+            background-color: #16a34a;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+          }
+          td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+          }
+          tr:hover {
+            background-color: #f9fafb;
+          }
+          .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e5e7eb;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+          }
+          .status-badge {
+            background: #dcfce7;
+            color: #16a34a;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+          }
+          @media print {
+            body { padding: 20px; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🌱 Clearo Sync Collection Reports</h1>
+          <p>Waste Management System</p>
+          <p>Generated on: ${new Date().toLocaleString()}</p>
+        </div>
 
-  // Download individual report
-  const handleDownloadReport = (report) => {
-    const content = `
-Collection Report - ${report.date}
-================================
-Total Collections: ${report.collections}
-Scheduled Collections: ${report.scheduledCollections}
-Status: ${report.status}
+        <div class="summary">
+          <h2>Report Summary</h2>
+          <p><strong>Total Reports:</strong> ${reports.length}</p>
+          <p><strong>Date Range:</strong> ${reports[reports.length - 1]?.date} to ${reports[0]?.date}</p>
+          <p><strong>Total Collections:</strong> ${reports.reduce((sum, r) => sum + r.collections, 0)}</p>
+        </div>
 
-Generated on: ${new Date().toLocaleString()}
-Clearo Sync - Waste Management System
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th style="text-align: center;">Total Collections</th>
+              <th style="text-align: center;">Scheduled</th>
+              <th style="text-align: center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${reports.map(report => `
+              <tr>
+                <td><strong>${report.date}</strong></td>
+                <td style="text-align: center;"><strong>${report.collections}</strong></td>
+                <td style="text-align: center;">${report.scheduledCollections}</td>
+                <td style="text-align: center;">
+                  <span class="status-badge">${report.status}</span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <p>© ${new Date().getFullYear()} Clearo Sync - Smart Waste Collection System</p>
+          <p>This report is automatically generated and contains confidential information.</p>
+        </div>
+
+        <div class="no-print" style="margin-top: 30px; text-align: center;">
+          <button onclick="window.print()" style="background: #16a34a; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin-right: 10px;">
+            Print / Save as PDF
+          </button>
+          <button onclick="window.close()" style="background: #6b7280; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px;">
+            Close
+          </button>
+        </div>
+      </body>
+      </html>
     `;
 
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  // Download individual report as PDF
+  const handleDownloadReport = (report) => {
+    const printWindow = window.open('', '_blank');
     
-    link.setAttribute('href', url);
-    link.setAttribute('download', `report_${report.date}.txt`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Collection Report - ${report.date}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #16a34a;
+            padding-bottom: 20px;
+          }
+          .header h1 {
+            color: #16a34a;
+            margin: 0;
+            font-size: 32px;
+          }
+          .report-details {
+            background: #f0fdf4;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 20px 0;
+          }
+          .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid #d1fae5;
+          }
+          .detail-row:last-child {
+            border-bottom: none;
+          }
+          .label {
+            font-weight: bold;
+            color: #16a34a;
+          }
+          .value {
+            color: #333;
+            font-size: 18px;
+          }
+          .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e5e7eb;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+          }
+          @media print {
+            body { padding: 20px; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🌱 Collection Report</h1>
+          <p style="color: #666; margin: 10px 0;">Clearo Sync - Waste Management System</p>
+        </div>
+
+        <div class="report-details">
+          <div class="detail-row">
+            <span class="label">Report Date:</span>
+            <span class="value">${report.date}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Total Collections:</span>
+            <span class="value">${report.collections}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Scheduled Collections:</span>
+            <span class="value">${report.scheduledCollections}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Status:</span>
+            <span class="value" style="color: #16a34a; font-weight: bold;">${report.status}</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>Generated on: ${new Date().toLocaleString()}</p>
+          <p>© ${new Date().getFullYear()} Clearo Sync - Smart Waste Collection System</p>
+        </div>
+
+        <div class="no-print" style="margin-top: 30px; text-align: center;">
+          <button onclick="window.print()" style="background: #16a34a; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; margin-right: 10px;">
+            Print / Save as PDF
+          </button>
+          <button onclick="window.close()" style="background: #6b7280; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px;">
+            Close
+          </button>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   if (loading) {
@@ -446,78 +646,16 @@ Clearo Sync - Waste Management System
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <div className="bg-gradient-to-r from-blue-100 to-blue-200 p-4 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-blue-700">Total Collections</p>
-              <p className="text-xl font-bold text-blue-800">{stats.totalCollections}</p>
-            </div>
-            <FaTruck className="text-blue-600 text-2xl" />
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-green-100 to-green-200 p-4 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-green-700">Total Waste</p>
-              <p className="text-xl font-bold text-green-800">{stats.totalWaste}</p>
-            </div>
-            <FaRecycle className="text-green-600 text-2xl" />
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-purple-100 to-purple-200 p-4 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-purple-700">Recycled</p>
-              <p className="text-xl font-bold text-purple-800">{stats.recycledMaterial}</p>
-            </div>
-            <FaRecycle className="text-purple-600 text-2xl" />
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-yellow-100 to-yellow-200 p-4 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-yellow-700">Routes</p>
-              <p className="text-xl font-bold text-yellow-800">{stats.routesCompleted}</p>
-            </div>
-            <FaCalendarAlt className="text-yellow-600 text-2xl" />
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-orange-100 to-orange-200 p-4 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-orange-700">Roads</p>
-              <p className="text-xl font-bold text-orange-800">{stats.roadsCompleted}</p>
-            </div>
-            <FaRoad className="text-orange-600 text-2xl" />
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-indigo-100 to-indigo-200 p-4 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-indigo-700">Fuel Used</p>
-              <p className="text-xl font-bold text-indigo-800">{stats.fuelConsumption}</p>
-            </div>
-            <FaTruck className="text-indigo-600 text-2xl" />
-          </div>
-        </div>
-      </div>
-
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h3 className="text-lg font-bold text-gray-800">Collection Reports</h3>
           <button 
-            onClick={handleExportCSV}
+            onClick={handleExportPDF}
             disabled={reports.length === 0}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <FaDownload className="mr-2" />
-            Export CSV
+            <FaFilePdf className="mr-2" />
+            Export PDF
           </button>
         </div>
         
@@ -551,10 +689,10 @@ Clearo Sync - Waste Management System
                     <td className="py-3 px-4 text-center">
                       <button 
                         onClick={() => handleDownloadReport(report)}
-                        className="text-green-600 hover:text-green-800 text-sm font-medium inline-flex items-center gap-1"
+                        className="text-red-600 hover:text-red-800 text-sm font-medium inline-flex items-center gap-1"
                       >
-                        <FaDownload className="w-3 h-3" />
-                        Download
+                        <FaFilePdf className="w-3 h-3" />
+                        PDF
                       </button>
                     </td>
                   </tr>

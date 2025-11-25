@@ -1,7 +1,7 @@
 import React from 'react';
-import { FaUsers, FaTrashAlt, FaClipboardList, FaExclamationCircle, FaCogs, FaCalendarAlt, FaTruck, FaLeaf, FaTasks, FaBell } from 'react-icons/fa';
+import { FaUsers, FaTrashAlt, FaClipboardList, FaExclamationCircle, FaCogs, FaCalendarAlt, FaTruck, FaLeaf, FaTasks } from 'react-icons/fa';
 
-const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssues, setSelectedView, unreadNotifications = 0 }) => {
+const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssues, setSelectedView, unreadNotifications }) => {
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good Morning' : currentHour < 18 ? 'Good Afternoon' : 'Good Evening';
 
@@ -20,29 +20,11 @@ const Overview = ({ userData, totalUsers, activeBins, binRequests, reportedIssue
         
         <div className="relative z-10 flex items-center justify-between">
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div>
-                <h1 className="text-4xl font-bold mb-2">
-                  {greeting}, {userData?.name}! 👋
-                </h1>
-                <p className="text-xl text-green-100 font-medium">{userData?.position}</p>
-              </div>
-              
-              {/* Notification Bell Icon */}
-              <button
-                onClick={() => setSelectedView('notifications')}
-                className="relative group ml-4"
-                title="View Notifications"
-              >
-                <div className="p-3 bg-white bg-opacity-20 backdrop-blur-sm rounded-2xl hover:bg-opacity-30 transition-all duration-300 group-hover:scale-110">
-                  <FaBell className="text-2xl text-white" />
-                </div>
-                {unreadNotifications > 0 && (
-                  <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-2 animate-pulse border-2 border-white shadow-lg">
-                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                  </div>
-                )}
-              </button>
+            <div>
+              <h1 className="text-4xl font-bold mb-2">
+                {greeting}, {userData?.name}! 👋
+              </h1>
+              <p className="text-xl text-green-100 font-medium">{userData?.position}</p>
             </div>
             <p className="text-green-50 text-lg max-w-2xl leading-relaxed">
               Welcome to your comprehensive waste management dashboard. Monitor operations, track progress, and manage your community efficiently.

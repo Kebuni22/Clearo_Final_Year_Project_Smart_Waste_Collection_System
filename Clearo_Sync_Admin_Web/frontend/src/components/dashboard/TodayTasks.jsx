@@ -484,149 +484,6 @@ export default function TodayTasks() {
     fetchTodayData();
   }, []);
 
-  // Real-time streams for smart bins and driver locations
-  useEffect(() => {
-    console.log('🔄 Setting up real-time data streams...');
-    
-    // Smart bins stream with proper coordinate handling
-    const unsubBins = onSnapshot(
-      collection(db, 'smart_bins'),
-      (snapshot) => {
-        console.log('📦 Smart bins snapshot:', snapshot.size, 'documents');
-        
-        const binsData = snapshot.docs.map((d) => {
-          const data = d.data();
-          
-          // Handle multiple coordinate field structures with priority order
-          const lat = Number(data.latitude || data.coordinates?.lat || data.location?.lat || data.lat || 0);
-          const lng = Number(data.longitude || data.coordinates?.lng || data.location?.lng || data.lng || 0);
-          
-          // Handle fill percentage from multiple sources
-          const fillPct = Number(data.fill_percentage || 
-                         data.fillPercentage || 
-                         data.fill_data?.fill_percentage || 
-                         0);
-
-          const bin = {
-            id: d.id,
-            binId: data.bin_id || d.id,
-            location: data.location || data.location_name || data.address || `Bin ${d.id.substring(0, 8)}`,
-            latitude: lat,
-            longitude: lng,
-            fillPercentage: Math.round(fillPct),
-            fillLevel: data.fill_level || data.fill_data?.fill_level || 'UNKNOWN',
-            binStatus: data.bin_status || data.fill_data?.bin_status || 'UNKNOWN',
-            wasteType: data.waste_type || 'General',
-            status: data.status || 'active',
-            lastUpdate: data.timestamp || data.last_updated || data.system?.last_update,
-            has_gps: data.has_gps,
-            location_set_by_resident: data.location_set_by_resident,
-            is_online: data.is_online || false
-          };
-
-          console.log(`✓ Processed bin ${bin.binId}: lat=${bin.latitude}, lng=${bin.longitude}, fill=${bin.fillPercentage}%`);
-          return bin;
-        }).filter(b => {
-          // Only filter out bins with explicitly invalid coordinates (0,0 or NaN)
-          // But keep bins with valid GPS coordinates
-          const hasValidCoords = !isNaN(b.latitude) && 
-                                 !isNaN(b.longitude) && 
-                                 b.latitude !== 0 && 
-                                 b.longitude !== 0;
-          
-          if (!hasValidCoords) {
-            console.warn(`⚠️ Filtered out bin ${b.binId} - Invalid coordinates: ${b.latitude}, ${b.longitude}`);
-          }
-          
-          return hasValidCoords;
-        });
-
-        console.log(`✅ Loaded ${binsData.length} valid bins with GPS coordinates out of ${snapshot.size} total`);
-        
-        // Log bins that were filtered out
-        const filteredCount = snapshot.size - binsData.length;
-        if (filteredCount > 0) {
-          console.warn(`⚠️ ${filteredCount} bins filtered out due to invalid/missing GPS coordinates`);
-        }
-        
-        setBins(binsData);
-      },
-      (err) => console.error('❌ smart_bins onSnapshot error:', err)
-    );
-
-    // Driver locations stream with proper coordinate handling
-    const unsubDrivers = onSnapshot(
-      collection(db, 'driver_locations'),
-      (snapshot) => {
-        console.log('📦 Driver locations snapshot:', snapshot.size, 'documents');
-        
-        const driverLocs = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          
-          // Handle multiple coordinate field names
-          const lat = data.latitude || data.lat;
-          const lng = data.longitude || data.lng;
-
-          console.log('Processing driver location:', data.driverName, 'at', lat, lng);
-          
-          return { 
-            id: doc.id, 
-            ...data,
-            latitude: Number(lat),
-            longitude: Number(lng)
-          };
-        });
-
-        // Enrich with vehicle data
-        const trucksFromDrivers = driverLocs.map((dl) => {
-          const vById = vehiclesLookup[dl.vehicleId || ''] || {};
-          const vByDriver = vehiclesLookup[`driver:${dl.driverName || ''}`] || {};
-          const enriched = vById.vehicleNumber ? vById : vByDriver.vehicleNumber ? vByDriver : {};
-          
-          const truck = {
-            id: dl.id,
-            driverId: dl.driverId || dl.id,
-            driverName: dl.driverName || 'Unknown Driver',
-            status: dl.status || 'in-progress',
-            assignedRoute: dl.assignedRoute,
-            vehicleNumber: dl.vehicleNumber || enriched.vehicleNumber || 'Unknown Vehicle',
-            type: enriched.type,
-            capacity: enriched.capacity,
-            currentLocation: {
-              lat: dl.latitude,
-              lng: dl.longitude,
-              timestamp: dl.timestamp || dl.updatedAt
-            }
-          };
-
-          console.log('Processed truck:', truck.vehicleNumber, 'at', truck.currentLocation.lat, truck.currentLocation.lng);
-          return truck;
-        }).filter(t => {
-          const isValid = t.currentLocation.lat && 
-                         t.currentLocation.lng && 
-                         !isNaN(t.currentLocation.lat) && 
-                         !isNaN(t.currentLocation.lng) &&
-                         t.currentLocation.lat !== 0 && 
-                         t.currentLocation.lng !== 0;
-          if (!isValid) {
-            console.warn('⚠️ Filtered out truck with invalid coordinates:', t.vehicleNumber);
-          }
-          return isValid;
-        });
-
-        console.log(`✓ Loaded ${trucksFromDrivers.length} valid trucks`);
-        setTrucks(trucksFromDrivers);
-      },
-      (err) => console.error('❌ driver_locations onSnapshot error:', err)
-    );
-
-    return () => {
-      console.log('🔄 Cleaning up real-time streams');
-      unsubBins();
-      unsubDrivers();
-    };
-  }, [db, vehiclesLookup]);
-
   const fetchTodayData = async () => {
     try {
       setLoading(true);
@@ -665,10 +522,18 @@ export default function TodayTasks() {
         ...doc.data() 
       }));
 
-      // Fetch drivers data
+      // Fetch drivers data and create lookup by uid
       const driversSnapshot = await getDocs(collection(db, 'drivers'));
       const driversData = driversSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setDrivers(driversData);
+
+      // Create driver lookup by uid for real-time matching
+      const driversByUid = {};
+      driversData.forEach(driver => {
+        if (driver.uid) {
+          driversByUid[driver.uid] = driver;
+        }
+      });
 
       // Fetch bins with location data from smart_bins collection
       const binsSnapshot = await getDocs(collection(db, 'smart_bins'));
@@ -695,9 +560,13 @@ export default function TodayTasks() {
         acc[v.id] = v;
         if (v.vehicleNumber) acc[v.vehicleNumber] = v;
         if (v.driverName) acc[`driver:${v.driverName}`] = v;
+        if (v.uid) acc[`uid:${v.uid}`] = v;
         return acc;
       }, {});
       setVehiclesLookup(lookup);
+
+      // Store for real-time listener
+      window.driversByUid = driversByUid;
 
       // Optional: initial trucks from vehicles (before real-time driver locations arrive)
       // setTrucks(vehiclesData.map(v => ({ ...v, currentLocation: v.currentLocation || null })));
@@ -744,6 +613,23 @@ export default function TodayTasks() {
             roadName = roadNames[index % roadNames.length];
           }
 
+          // Get time from schedule - prioritize timeSlot field, then fallback to individual fields
+          let startTime = '08:00';
+          let endTime = '17:00';
+          
+          if (schedule.timeSlot) {
+            // Parse timeSlot format: "12:00 PM - 2:00 PM"
+            const timeSlotParts = schedule.timeSlot.split(' - ');
+            if (timeSlotParts.length === 2) {
+              startTime = convertTo24Hour(timeSlotParts[0].trim());
+              endTime = convertTo24Hour(timeSlotParts[1].trim());
+            }
+          } else {
+            // Fallback to individual time fields
+            startTime = schedule.startTime || schedule.start_time || schedule.time || '08:00';
+            endTime = schedule.endTime || schedule.end_time || schedule.time_end || '17:00';
+          }
+
           return {
             id: schedule.id,
             roadName: roadName,
@@ -752,18 +638,44 @@ export default function TodayTasks() {
             wasteType: schedule.wasteType || 'General',
             assignedDriver: schedule.driverName || 'Unassigned',
             driverId: schedule.driverId,
-            startTime: schedule.startTime || '08:00',
-            endTime: schedule.endTime || '17:00',
+            startTime: startTime,
+            endTime: endTime,
+            timeSlot: schedule.timeSlot || `${startTime} - ${endTime}`,
             status: schedule.status || 'pending',
             priority: schedule.priority || 'medium',
-            estimatedDuration: schedule.estimatedDuration || '8 hours',
+            estimatedDuration: schedule.estimatedDuration || schedule.duration || calculateDuration(startTime, endTime),
             completedBins: schedule.completedLocations?.length || 0,
             totalBins: schedule.locations?.length || 5
           };
         });
         setRoadsSchedule(derivedRoads);
       } else {
-        setRoadsSchedule(todayRoadsSchedule);
+        // Use roads from roads_schedule collection with their assigned times
+        const enrichedRoads = todayRoadsSchedule.map(road => {
+          let startTime = '08:00';
+          let endTime = '17:00';
+          
+          if (road.timeSlot) {
+            // Parse timeSlot format: "12:00 PM - 2:00 PM"
+            const timeSlotParts = road.timeSlot.split(' - ');
+            if (timeSlotParts.length === 2) {
+              startTime = convertTo24Hour(timeSlotParts[0].trim());
+              endTime = convertTo24Hour(timeSlotParts[1].trim());
+            }
+          } else {
+            startTime = road.startTime || road.start_time || road.time || '08:00';
+            endTime = road.endTime || road.end_time || road.time_end || '17:00';
+          }
+
+          return {
+            ...road,
+            startTime: startTime,
+            endTime: endTime,
+            timeSlot: road.timeSlot || `${startTime} - ${endTime}`,
+            estimatedDuration: road.estimatedDuration || road.duration || calculateDuration(startTime, endTime)
+          };
+        });
+        setRoadsSchedule(enrichedRoads);
       }
 
       // Generate tasks from today's schedules
@@ -816,6 +728,52 @@ export default function TodayTasks() {
       setTrucks([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper function to convert 12-hour format to 24-hour format
+  const convertTo24Hour = (time12h) => {
+    try {
+      const [time, modifier] = time12h.split(' ');
+      let [hours, minutes] = time.split(':');
+      
+      hours = parseInt(hours, 10);
+      
+      if (modifier === 'PM' && hours !== 12) {
+        hours += 12;
+      } else if (modifier === 'AM' && hours === 12) {
+        hours = 0;
+      }
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes}`;
+    } catch (error) {
+      console.error('Error converting time:', error);
+      return '08:00';
+    }
+  };
+
+  // Helper function to calculate duration between two times
+  const calculateDuration = (startTime, endTime) => {
+    try {
+      const [startHour, startMin] = startTime.split(':').map(Number);
+      const [endHour, endMin] = endTime.split(':').map(Number);
+      
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+      const durationMinutes = endMinutes - startMinutes;
+      
+      const hours = Math.floor(durationMinutes / 60);
+      const minutes = durationMinutes % 60;
+      
+      if (hours > 0 && minutes > 0) {
+        return `${hours}h ${minutes}m`;
+      } else if (hours > 0) {
+        return `${hours} hours`;
+      } else {
+        return `${minutes} minutes`;
+      }
+    } catch (error) {
+      return '2 hours';
     }
   };
 
@@ -951,16 +909,178 @@ export default function TodayTasks() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-green-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading today's routes...</p>
-        </div>
-      </div>
+  // Real-time streams for smart bins and driver locations
+  useEffect(() => {
+    console.log('🔄 Setting up real-time data streams...');
+    
+    // Smart bins stream with proper coordinate handling
+    const unsubBins = onSnapshot(
+      collection(db, 'smart_bins'),
+      (snapshot) => {
+        console.log('📦 Smart bins snapshot:', snapshot.size, 'documents');
+        
+        const binsData = snapshot.docs.map((d) => {
+          const data = d.data();
+          
+          // Handle multiple coordinate field structures with priority order
+          const lat = Number(data.latitude || data.coordinates?.lat || data.location?.lat || data.lat || 0);
+          const lng = Number(data.longitude || data.coordinates?.lng || data.location?.lng || data.lng || 0);
+          
+          // Handle fill percentage from multiple sources
+          const fillPct = Number(data.fill_percentage || 
+                         data.fillPercentage || 
+                         data.fill_data?.fill_percentage || 
+                         0);
+
+          const bin = {
+            id: d.id,
+            binId: data.bin_id || d.id,
+            location: data.location || data.location_name || data.address || `Bin ${d.id.substring(0, 8)}`,
+            latitude: lat,
+            longitude: lng,
+            fillPercentage: Math.round(fillPct),
+            fillLevel: data.fill_level || data.fill_data?.fill_level || 'UNKNOWN',
+            binStatus: data.bin_status || data.fill_data?.bin_status || 'UNKNOWN',
+            wasteType: data.waste_type || 'General',
+            status: data.status || 'active',
+            lastUpdate: data.timestamp || data.last_updated || data.system?.last_update,
+            has_gps: data.has_gps,
+            location_set_by_resident: data.location_set_by_resident,
+            is_online: data.is_online || false
+          };
+
+          console.log(`✓ Processed bin ${bin.binId}: lat=${bin.latitude}, lng=${bin.longitude}, fill=${bin.fillPercentage}%`);
+          return bin;
+        }).filter(b => {
+          // Only filter out bins with explicitly invalid coordinates (0,0 or NaN)
+          // But keep bins with valid GPS coordinates
+          const hasValidCoords = !isNaN(b.latitude) && 
+                                 !isNaN(b.longitude) && 
+                                 b.latitude !== 0 && 
+                                 b.longitude !== 0;
+          
+          if (!hasValidCoords) {
+            console.warn(`⚠️ Filtered out bin ${b.binId} - Invalid coordinates: ${b.latitude}, ${b.longitude}`);
+          }
+          
+          return hasValidCoords;
+        });
+
+        console.log(`✅ Loaded ${binsData.length} valid bins with GPS coordinates out of ${snapshot.size} total`);
+        
+        // Log bins that were filtered out
+        const filteredCount = snapshot.size - binsData.length;
+        if (filteredCount > 0) {
+          console.warn(`⚠️ ${filteredCount} bins filtered out due to invalid/missing GPS coordinates`);
+        }
+        
+        setBins(binsData);
+      },
+      (err) => console.error('❌ smart_bins onSnapshot error:', err)
     );
-  }
+
+    // Driver locations stream with proper uid matching
+    const unsubDrivers = onSnapshot(
+      collection(db, 'driver_locations'),
+      (snapshot) => {
+        console.log('📦 Driver locations snapshot:', snapshot.size, 'documents');
+        
+        const driverLocs = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          
+          // Get coordinates
+          const lat = Number(data.latitude || data.lat);
+          const lng = Number(data.longitude || data.lng);
+
+          // Get driver details from drivers collection using uid
+          const driverDetails = window.driversByUid?.[data.uid] || {};
+
+          console.log('Processing driver location:', {
+            uid: data.uid,
+            driverFromLookup: driverDetails.name,
+            lat,
+            lng,
+            isOnline: data.isOnline
+          });
+          
+          return { 
+            id: doc.id,
+            uid: data.uid,
+            latitude: lat,
+            longitude: lng,
+            isOnline: data.isOnline,
+            timestamp: data.timestamp,
+            // Merge driver details
+            driverName: driverDetails.name || 'Unknown Driver',
+            employeeNumber: driverDetails.employeeNumber,
+            phone: driverDetails.phone,
+            email: driverDetails.email
+          };
+        });
+
+        // Enrich with vehicle data
+        const trucksFromDrivers = driverLocs.map((dl) => {
+          const vByUid = vehiclesLookup[`uid:${dl.uid}`] || {};
+          const vById = vehiclesLookup[dl.vehicleId || ''] || {};
+          const vByDriver = vehiclesLookup[`driver:${dl.driverName || ''}`] || {};
+          const enriched = vByUid.vehicleNumber ? vByUid : 
+                          vById.vehicleNumber ? vById : 
+                          vByDriver.vehicleNumber ? vByDriver : {};
+          
+          const truck = {
+            id: dl.id,
+            driverId: dl.uid,
+            uid: dl.uid,
+            driverName: dl.driverName,
+            employeeNumber: dl.employeeNumber,
+            phone: dl.phone,
+            email: dl.email,
+            status: dl.isOnline ? 'in-progress' : 'offline',
+            isOnline: dl.isOnline,
+            vehicleNumber: enriched.vehicleNumber || 'Unknown Vehicle',
+            type: enriched.type,
+            capacity: enriched.capacity,
+            assignedRoute: enriched.assignedRoute,
+            currentLocation: {
+              lat: dl.latitude,
+              lng: dl.longitude,
+              timestamp: dl.timestamp
+            }
+          };
+
+          console.log('✓ Processed truck:', {
+            vehicleNumber: truck.vehicleNumber,
+            driverName: truck.driverName,
+            uid: truck.uid,
+            isOnline: truck.isOnline,
+            location: { lat: truck.currentLocation.lat, lng: truck.currentLocation.lng }
+          });
+          return truck;
+        }).filter(t => {
+          const isValid = t.currentLocation.lat && 
+                         t.currentLocation.lng && 
+                         !isNaN(t.currentLocation.lat) && 
+                         !isNaN(t.currentLocation.lng) &&
+                         t.currentLocation.lat !== 0 && 
+                         t.currentLocation.lng !== 0;
+          if (!isValid) {
+            console.warn('⚠️ Filtered out truck with invalid coordinates:', t.vehicleNumber, t.driverName);
+          }
+          return isValid;
+        });
+
+        console.log(`✓ Loaded ${trucksFromDrivers.length} valid trucks with driver details`);
+        setTrucks(trucksFromDrivers);
+      },
+      (err) => console.error('❌ driver_locations onSnapshot error:', err)
+    );
+
+    return () => {
+      console.log('🔄 Cleaning up real-time streams');
+      unsubBins();
+      unsubDrivers();
+    };
+  }, [db, vehiclesLookup]);
 
   return (
     <div className="space-y-6">
@@ -1103,9 +1223,6 @@ export default function TodayTasks() {
                     <h3 className="font-bold text-gray-900 text-lg leading-tight">
                       {road.roadName}
                     </h3>
-                    <p className="text-sm text-gray-500 font-mono">
-                      Route {road.routeCode}
-                    </p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusColor(road.status)}`}>
                     {road.status || 'pending'}
@@ -1142,14 +1259,14 @@ export default function TodayTasks() {
                   </div>
                 </div>
 
-                {/* Time Slot */}
+                {/* Time Slot - Display the timeSlot directly */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <FaClock className="text-blue-500" size={14} />
                     <span className="text-sm font-medium text-gray-600">Time Slot:</span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {road.startTime} - {road.endTime}
+                  <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                    {road.timeSlot || `${road.startTime} - ${road.endTime}`}
                   </span>
                 </div>
 

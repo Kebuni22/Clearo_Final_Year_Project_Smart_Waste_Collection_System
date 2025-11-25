@@ -1,7 +1,7 @@
 // src/pages/Dashboard.js
 import React, { useEffect, useState } from 'react';
 import { auth, db } from '../firebase/config';
-import { doc, getDoc, collection, getDocs, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -170,19 +170,29 @@ export default function Dashboard() {
         const requestsSnapshot = await getDocs(collection(db, 'binRequests'));
         setBinRequests(requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-        // Fetch reported issues
-        const issuesSnapshot = await getDocs(collection(db, 'reportedIssues'));
-        const issuesData = issuesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setReportedIssues(issuesData);
-        
-        console.log('Reported Issues Count:', issuesData.length);
-        console.log('Reported Issues Data:', issuesData);
       } catch (err) {
         console.error('Error fetching overview data:', err);
       }
     };
 
     fetchOverviewData();
+
+    // Set up real-time listener for reported issues
+    const issuesQuery = query(
+      collection(db, 'issues'),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(issuesQuery, (snapshot) => {
+      const issuesData = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }));
+      setReportedIssues(issuesData);
+      console.log('📊 Issues count updated:', issuesData.length);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Add additional useEffect to fetch data based on selected view

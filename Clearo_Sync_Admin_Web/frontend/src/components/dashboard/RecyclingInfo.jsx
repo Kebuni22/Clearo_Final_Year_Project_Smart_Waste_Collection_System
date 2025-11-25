@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { FaRecycle, FaLeaf, FaLightbulb, FaMapMarkedAlt } from 'react-icons/fa';
+import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
 
 const RecyclingInfo = () => {
   const [activeTab, setActiveTab] = useState('categories');
+  const [selectedCenter, setSelectedCenter] = useState(null);
 
   const tabs = [
     { id: 'categories', name: 'Categories', icon: <FaRecycle /> },
@@ -54,10 +56,90 @@ const RecyclingInfo = () => {
   ];
 
   const recyclingCenters = [
-    { name: 'Green Valley Recycling', address: '123 Main St', hours: '9 AM - 5 PM', materials: 'All materials' },
-    { name: 'EcoCenter Downtown', address: '456 Oak Ave', hours: '8 AM - 6 PM', materials: 'Plastic, Paper, Glass' },
-    { name: 'City Recycling Hub', address: '789 Pine Rd', hours: '7 AM - 7 PM', materials: 'Electronics, Metal' },
+    { 
+      name: 'Colombo Municipal Council - Central Recycling Center', 
+      address: 'Dam Street, Colombo 12', 
+      hours: '8 AM - 4 PM (Mon-Sat)', 
+      materials: 'Paper, Plastic, Glass, Metal',
+      lat: 6.9334,
+      lng: 79.8538,
+      phone: '+94 11 2 691261'
+    },
+    { 
+      name: 'Kaduwela Waste Management Center', 
+      address: 'Malabe Road, Kaduwela', 
+      hours: '7 AM - 5 PM (Daily)', 
+      materials: 'E-waste, Plastic, Metal, Glass',
+      lat: 6.9330,
+      lng: 79.9840,
+      phone: '+94 11 2 545454'
+    },
+    { 
+      name: 'Keells Super - Recycling Point', 
+      address: 'Union Place, Colombo 02', 
+      hours: '9 AM - 9 PM (Daily)', 
+      materials: 'Plastic bottles, Shopping bags',
+      lat: 6.9147,
+      lng: 79.8612,
+      phone: '+94 11 2 306306'
+    },
+    { 
+      name: 'Selyn - Eco-Friendly Collection Point', 
+      address: '34 Ward Place, Colombo 07', 
+      hours: '9 AM - 5 PM (Mon-Sat)', 
+      materials: 'Textiles, Paper, Cardboard',
+      lat: 6.9099,
+      lng: 79.8746,
+      phone: '+94 11 2 682821'
+    },
+    { 
+      name: 'Karadiyana Waste Management Plant', 
+      address: 'Karadiyana, Dehiwala', 
+      hours: '6 AM - 6 PM (Mon-Fri)', 
+      materials: 'All recyclable waste',
+      lat: 6.8385,
+      lng: 79.8837,
+      phone: '+94 11 2 713838'
+    },
+    { 
+      name: 'Orion City - Green Point', 
+      address: 'Rajagiriya', 
+      hours: '10 AM - 8 PM (Daily)', 
+      materials: 'Paper, Plastic, Glass',
+      lat: 6.9147,
+      lng: 79.9020,
+      phone: '+94 11 4 385000'
+    },
+    { 
+      name: 'Battaramulla Pradeshiya Sabha Recycling Center', 
+      address: 'Battaramulla', 
+      hours: '8 AM - 4 PM (Mon-Sat)', 
+      materials: 'Metal, E-waste, Batteries',
+      lat: 6.8988,
+      lng: 79.9192,
+      phone: '+94 11 2 887766'
+    },
+    { 
+      name: 'Nuge Sea Beach Hotel - Waste Collection', 
+      address: 'Mount Lavinia', 
+      hours: '7 AM - 3 PM (Mon-Sat)', 
+      materials: 'Organic waste, Glass, Plastic',
+      lat: 6.8318,
+      lng: 79.8636,
+      phone: '+94 11 2 738129'
+    }
   ];
+
+  const mapContainerStyle = {
+    width: '100%',
+    height: '500px',
+    borderRadius: '8px'
+  };
+
+  const center = {
+    lat: 6.9147,
+    lng: 79.8910
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -114,27 +196,107 @@ const RecyclingInfo = () => {
 
       case 'centers':
         return (
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold mb-4">Nearby Recycling Centers</h3>
-            {recyclingCenters.map((center, index) => (
-              <div key={index} className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-                <h4 className="text-lg font-bold text-blue-800 mb-2">{center.name}</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-gray-700">
-                  <div>
-                    <strong>Address:</strong><br />
-                    {center.address}
-                  </div>
-                  <div>
-                    <strong>Hours:</strong><br />
-                    {center.hours}
-                  </div>
-                  <div>
-                    <strong>Accepts:</strong><br />
-                    {center.materials}
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold mb-4">Recycling Centers in Colombo</h3>
+            
+            {/* Google Map */}
+            <div className="bg-white rounded-lg border border-gray-300 overflow-hidden shadow-md">
+              <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY_HERE'}>
+                <GoogleMap
+                  mapContainerStyle={mapContainerStyle}
+                  center={center}
+                  zoom={11}
+                >
+                  {recyclingCenters.map((center, index) => (
+                    <Marker
+                      key={index}
+                      position={{ lat: center.lat, lng: center.lng }}
+                      onClick={() => setSelectedCenter(center)}
+                      icon={{
+                        url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                      }}
+                      label={{
+                        text: String(index + 1),
+                        color: 'white',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  ))}
+                  
+                  {selectedCenter && (
+                    <InfoWindow
+                      position={{ lat: selectedCenter.lat, lng: selectedCenter.lng }}
+                      onCloseClick={() => setSelectedCenter(null)}
+                    >
+                      <div className="p-2 max-w-xs">
+                        <h4 className="font-bold text-green-800 mb-2">{selectedCenter.name}</h4>
+                        <p className="text-sm text-gray-700 mb-1">
+                          <strong>📍</strong> {selectedCenter.address}
+                        </p>
+                        <p className="text-sm text-gray-600 mb-1">
+                          <strong>🕒</strong> {selectedCenter.hours}
+                        </p>
+                        <p className="text-sm text-gray-600 mb-1">
+                          <strong>♻️</strong> {selectedCenter.materials}
+                        </p>
+                        {selectedCenter.phone && (
+                          <p className="text-sm text-blue-600">
+                            <strong>📞</strong> {selectedCenter.phone}
+                          </p>
+                        )}
+                      </div>
+                    </InfoWindow>
+                  )}
+                </GoogleMap>
+              </LoadScript>
+            </div>
+
+            {/* List of Centers */}
+            <div className="space-y-4 mt-6">
+              {recyclingCenters.map((center, index) => (
+                <div 
+                  key={index} 
+                  className="bg-blue-50 p-6 rounded-lg border border-blue-200 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => setSelectedCenter(center)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-3">
+                      <div className="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-bold text-blue-800 mb-2">{center.name}</h4>
+                        <div className="space-y-2 text-gray-700 text-sm">
+                          <p>
+                            <strong>📍 Address:</strong> {center.address}
+                          </p>
+                          <p>
+                            <strong>🕒 Hours:</strong> {center.hours}
+                          </p>
+                          <p>
+                            <strong>♻️ Accepts:</strong> {center.materials}
+                          </p>
+                          {center.phone && (
+                            <p>
+                              <strong>📞 Contact:</strong> {center.phone}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <button 
+                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(`https://www.google.com/maps/dir/?api=1&destination=${center.lat},${center.lng}`, '_blank');
+                      }}
+                    >
+                      Get Directions
+                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         );
 
