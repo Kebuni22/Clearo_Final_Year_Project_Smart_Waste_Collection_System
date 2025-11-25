@@ -26,6 +26,7 @@ import {
   FaRecycle,
   FaShareAlt,
   FaSeedling,
+  FaUserShield,
 } from 'react-icons/fa';
 
 // Import component sections
@@ -414,6 +415,7 @@ export default function Dashboard() {
         { label: 'Residents', icon: <FaUsers />, view: 'residents' },
         { label: 'Drivers', icon: <FaTruck />, view: 'drivers' },
         { label: 'Clea~Ro Bins', icon: <FaTrashAlt />, view: 'clearoBins' },
+        { label: 'Administration', icon: <FaUserShield />, view: 'administration' },
       ],
     },
     {
