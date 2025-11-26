@@ -1,8 +1,60 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'dart:ui';
 
 class NotificationService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+
+  Future<void> initialize() async {
+    tz.initializeTimeZones();
+
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _notifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onNotificationTap,
+    );
+
+    // Request permissions for iOS
+    await _notifications
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
+
+    // Request permissions for Android 13+
+    await _notifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
+  }
+
+  void _onNotificationTap(NotificationResponse response) {
+    // Handle notification tap
+    print('Notification tapped: ${response.payload}');
+  }
 
   // Monitor smart bins and send notifications when full
   static Future<void> checkSmartBinStatus() async {
@@ -18,8 +70,7 @@ class NotificationService {
             _getFirestoreValue(fillData?['is_critical']) ?? false;
         final isFull = _getFirestoreValue(fillData?['is_full']) ?? false;
         final binId = _getFirestoreValue(data['bin_id'])?.toString() ?? doc.id;
-        final location =
-            _getFirestoreValue(data['location'])?.toString() ??
+        final location = _getFirestoreValue(data['location'])?.toString() ??
             'Unknown Location';
 
         // Push notification if Clea~Ro bin level is above 76
@@ -44,19 +95,18 @@ class NotificationService {
   ) async {
     try {
       // Check if notification already sent recently (within last 2 hours)
-      final recentNotification =
-          await _firestore
-              .collection('user_notifications')
-              .where('binId', isEqualTo: binId)
-              .where('type', isEqualTo: 'bin_full')
-              .where(
-                'createdAt',
-                isGreaterThan: Timestamp.fromDate(
-                  DateTime.now().subtract(Duration(hours: 2)),
-                ),
-              )
-              .limit(1)
-              .get();
+      final recentNotification = await _firestore
+          .collection('user_notifications')
+          .where('binId', isEqualTo: binId)
+          .where('type', isEqualTo: 'bin_full')
+          .where(
+            'createdAt',
+            isGreaterThan: Timestamp.fromDate(
+              DateTime.now().subtract(Duration(hours: 2)),
+            ),
+          )
+          .limit(1)
+          .get();
 
       // Fix: Only skip sending if a notification for this bin and this fill level exists
       final alreadySent = recentNotification.docs.any((doc) {
@@ -140,14 +190,12 @@ class NotificationService {
     String location,
   ) async {
     try {
-      final title =
-          status == 'approved'
-              ? 'Bin Request Approved ✅'
-              : 'Bin Request Update 📋';
-      final message =
-          status == 'approved'
-              ? 'Your bin request for $location has been approved and will be delivered soon.'
-              : 'Your bin request for $location status has been updated to: $status';
+      final title = status == 'approved'
+          ? 'Bin Request Approved ✅'
+          : 'Bin Request Update 📋';
+      final message = status == 'approved'
+          ? 'Your bin request for $location has been approved and will be delivered soon.'
+          : 'Your bin request for $location status has been updated to: $status';
 
       await _firestore.collection('user_notifications').add({
         'userId': userId,
@@ -199,12 +247,11 @@ class NotificationService {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final unreadNotifications =
-          await _firestore
-              .collection('user_notifications')
-              .where('userId', isEqualTo: user.uid)
-              .where('isRead', isEqualTo: false)
-              .get();
+      final unreadNotifications = await _firestore
+          .collection('user_notifications')
+          .where('userId', isEqualTo: user.uid)
+          .where('isRead', isEqualTo: false)
+          .get();
 
       final batch = _firestore.batch();
       for (var doc in unreadNotifications.docs) {
@@ -214,6 +261,151 @@ class NotificationService {
     } catch (e) {
       print('Error marking all notifications as read: $e');
     }
+  }
+
+  Future<void> scheduleCollectionReminder({
+    required String scheduleId,
+    required String wasteType,
+    required DateTime collectionDate,
+    required String timeSlot,
+    required String roadName,
+  }) async {
+    try {
+      // Parse time slot to get start time
+      final startTime = timeSlot.split(' - ')[0].trim();
+      final scheduledDateTime = _parseDateTime(collectionDate, startTime);
+
+      // Schedule notification 1 day before at 8 PM
+      final reminderDateTime = scheduledDateTime.subtract(
+        const Duration(days: 1),
+      );
+      final notificationTime = DateTime(
+        reminderDateTime.year,
+        reminderDateTime.month,
+        reminderDateTime.day,
+        20, // 8 PM
+        0,
+      );
+
+      final notificationId = scheduleId.hashCode;
+      await _notifications.zonedSchedule(
+        notificationId,
+        '🗑️ Waste Collection Reminder',
+        '$wasteType collection tomorrow at $timeSlot on $roadName',
+        tz.TZDateTime.from(notificationTime, tz.local),
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'collection_reminders',
+            'Collection Reminders',
+            channelDescription: 'Reminders for waste collection schedules',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+            color: Color(0xFF4CAF50),
+            playSound: true,
+            enableVibration: true,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: jsonEncode({
+          'scheduleId': scheduleId,
+          'wasteType': wasteType,
+          'date': collectionDate.toIso8601String(),
+        }),
+      );
+
+      // Save reminder to SharedPreferences
+      await _saveReminder(scheduleId, {
+        'notificationId': notificationId,
+        'wasteType': wasteType,
+        'collectionDate': collectionDate.toIso8601String(),
+        'timeSlot': timeSlot,
+        'roadName': roadName,
+        'reminderDateTime': notificationTime.toIso8601String(),
+      });
+
+      print('✅ Reminder scheduled for $notificationTime');
+    } catch (e) {
+      print('❌ Error scheduling reminder: $e');
+      rethrow;
+    }
+  }
+
+  DateTime _parseDateTime(DateTime date, String timeStr) {
+    try {
+      // Parse "12:00 PM" format
+      final parts = timeStr.split(' ');
+      final timeParts = parts[0].split(':');
+      var hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      final isPM = parts.length > 1 && parts[1].toUpperCase() == 'PM';
+
+      if (isPM && hour != 12) hour += 12;
+      if (!isPM && hour == 12) hour = 0;
+
+      return DateTime(date.year, date.month, date.day, hour, minute);
+    } catch (e) {
+      return DateTime(date.year, date.month, date.day, 8, 0);
+    }
+  }
+
+  Future<void> _saveReminder(
+    String scheduleId,
+    Map<String, dynamic> data,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final reminders = await getAllReminders();
+    reminders[scheduleId] = data;
+    await prefs.setString('collection_reminders', jsonEncode(reminders));
+  }
+
+  Future<Map<String, dynamic>> getAllReminders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remindersJson = prefs.getString('collection_reminders');
+    if (remindersJson == null) return {};
+    return Map<String, dynamic>.from(jsonDecode(remindersJson));
+  }
+
+  Future<bool> isReminderSet(String scheduleId) async {
+    final reminders = await getAllReminders();
+    return reminders.containsKey(scheduleId);
+  }
+
+  Future<void> cancelReminder(String scheduleId) async {
+    try {
+      final reminders = await getAllReminders();
+      final reminderData = reminders[scheduleId];
+
+      if (reminderData != null) {
+        final notificationId = reminderData['notificationId'] as int;
+        await _notifications.cancel(notificationId);
+
+        reminders.remove(scheduleId);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('collection_reminders', jsonEncode(reminders));
+
+        print('✅ Reminder cancelled for schedule: $scheduleId');
+      }
+    } catch (e) {
+      print('❌ Error cancelling reminder: $e');
+    }
+  }
+
+  Future<void> cancelAllReminders() async {
+    await _notifications.cancelAll();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('collection_reminders');
+  }
+
+  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    return await _notifications.pendingNotificationRequests();
   }
 
   // Helper function to extract Firestore values

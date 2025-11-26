@@ -137,10 +137,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     textPainter.layout();
 
     final iconX = (size - textPainter.width) / 2;
-    final iconY =
-        text != null
-            ? (size * 0.35 - textPainter.height / 2)
-            : (size - textPainter.height) / 2;
+    final iconY = text != null
+        ? (size * 0.35 - textPainter.height / 2)
+        : (size - textPainter.height) / 2;
     textPainter.paint(canvas, Offset(iconX, iconY));
 
     if (text != null) {
@@ -161,9 +160,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     }
 
     final image = await pictureRecorder.endRecording().toImage(
-      size.toInt(),
-      size.toInt(),
-    );
+          size.toInt(),
+          size.toInt(),
+        );
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
@@ -264,9 +263,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       setState(() => _locationStatus = 'Getting GPS location...');
 
       _currentLocation = await location.getLocation().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('Location request timed out'),
-      );
+            const Duration(seconds: 10),
+            onTimeout: () =>
+                throw TimeoutException('Location request timed out'),
+          );
 
       if (_currentLocation != null) {
         setState(() {
@@ -387,9 +387,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           .collection('driver_locations')
           .doc(user.uid)
           .set({
-            'online': false,
-            'lastSeen': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+        'online': false,
+        'lastSeen': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (e) {
       print('Error marking driver offline: $e');
     }
@@ -409,8 +409,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           _currentLocation!.latitude!,
           _currentLocation!.longitude!,
         ),
-        icon:
-            _truckIcon ??
+        icon: _truckIcon ??
             BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
         infoWindow: InfoWindow(
           title: 'Your Truck',
@@ -432,11 +431,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (!userDoc.exists) return;
 
       final userData = userDoc.data() as Map<String, dynamic>;
@@ -446,20 +444,18 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       final todayStr =
           "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
 
-      final pickupsQuery =
-          await FirebaseFirestore.instance
-              .collection('pickups')
-              .where('driverName', isEqualTo: driverName)
-              .where('date', isEqualTo: todayStr)
-              .get();
+      final pickupsQuery = await FirebaseFirestore.instance
+          .collection('pickups')
+          .where('driverName', isEqualTo: driverName)
+          .where('date', isEqualTo: todayStr)
+          .get();
 
       List<Map<String, dynamic>> pickups = [];
       int completed = 0;
 
       for (var doc in pickupsQuery.docs) {
         final data = doc.data();
-        final coords =
-            data['coordinates'] ??
+        final coords = data['coordinates'] ??
             _getDefaultCoordinatesForLocation(data['location']);
 
         pickups.add({
@@ -524,11 +520,10 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       print('Optimizing collection route...');
 
       // Filter bins that need collection (HIGH and MEDIUM priority)
-      List<Map<String, dynamic>> binsToCollect =
-          _smartBins.where((bin) {
-            final fillLevel = bin['fillLevel'] as int;
-            return fillLevel >= 40; // MEDIUM and HIGH bins
-          }).toList();
+      List<Map<String, dynamic>> binsToCollect = _smartBins.where((bin) {
+        final fillLevel = bin['fillLevel'] as int;
+        return fillLevel >= 40; // MEDIUM and HIGH bins
+      }).toList();
 
       if (binsToCollect.isEmpty) {
         setState(() {
@@ -598,10 +593,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
       setState(() {
         _optimizedRoute = route;
         _totalRouteDistance = totalDistance;
-        _estimatedRouteTime =
-            totalMinutes < 60
-                ? '$totalMinutes min'
-                : '${(totalMinutes / 60).toStringAsFixed(1)} hrs';
+        _estimatedRouteTime = totalMinutes < 60
+            ? '$totalMinutes min'
+            : '${(totalMinutes / 60).toStringAsFixed(1)} hrs';
       });
 
       _drawOptimizedRoute();
@@ -623,8 +617,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     final dLat = (point2.latitude - point1.latitude) * math.pi / 180;
     final dLng = (point2.longitude - point1.longitude) * math.pi / 180;
 
-    final a =
-        math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(lat1) *
             math.cos(lat2) *
             math.sin(dLng / 2) *
@@ -666,8 +659,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
               _currentLocation!.latitude!,
               _currentLocation!.longitude!,
             ),
-            icon:
-                _truckIcon ??
+            icon: _truckIcon ??
                 BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
             infoWindow: InfoWindow(
               title: 'Your Truck',
@@ -727,16 +719,15 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 title: isInRoute ? 'Stop #$routeNumber: $binId' : 'Bin: $binId',
                 snippet: 'Fill: $fillLevel% • $status\n$address',
               ),
-              onTap:
-                  () => _showBinDetails(
-                    binId,
-                    fillLevel,
-                    status,
-                    address,
-                    lat,
-                    lng,
-                    isInRoute ? routeNumber : null,
-                  ),
+              onTap: () => _showBinDetails(
+                binId,
+                fillLevel,
+                status,
+                address,
+                lat,
+                lng,
+                isInRoute ? routeNumber : null,
+              ),
             ),
           );
 
@@ -761,8 +752,8 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
                 pickup['status'] == 'Completed'
                     ? BitmapDescriptor.hueGreen
                     : pickup['priority'] == 'high'
-                    ? BitmapDescriptor.hueRed
-                    : BitmapDescriptor.hueOrange,
+                        ? BitmapDescriptor.hueRed
+                        : BitmapDescriptor.hueOrange,
               ),
             ),
           );
@@ -783,13 +774,13 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           .collection('smart_bins')
           .snapshots()
           .listen(
-            (QuerySnapshot snapshot) {
-              _handleSmartBinDataChange(snapshot);
-            },
-            onError: (error) {
-              print('Error in smart bin listener: $error');
-            },
-          );
+        (QuerySnapshot snapshot) {
+          _handleSmartBinDataChange(snapshot);
+        },
+        onError: (error) {
+          print('Error in smart bin listener: $error');
+        },
+      );
     } catch (e) {
       print('Error starting smart bin listener: $e');
     }
@@ -820,11 +811,9 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         // Extract location data
         if (data['location_data'] != null && data['location_data'] is Map) {
           final locationData = data['location_data'] as Map<String, dynamic>;
-          lat =
-              _parseDouble(locationData['latitude']) ??
+          lat = _parseDouble(locationData['latitude']) ??
               _parseDouble(locationData['lat']);
-          lng =
-              _parseDouble(locationData['longitude']) ??
+          lng = _parseDouble(locationData['longitude']) ??
               _parseDouble(locationData['lng']);
           address = locationData['address']?.toString() ?? '';
           print('Location from location_data: lat=$lat, lng=$lng');
@@ -837,8 +826,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         }
 
         if (address.isEmpty) {
-          address =
-              data['address']?.toString() ??
+          address = data['address']?.toString() ??
               data['location']?.toString() ??
               'Unknown location';
         }
@@ -890,8 +878,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     // Method 1: Check fill_data nested object
     if (data['fill_data'] != null && data['fill_data'] is Map) {
       final fillData = data['fill_data'] as Map<String, dynamic>;
-      fillLevel =
-          _parseInt(fillData['fillLevel']) ??
+      fillLevel = _parseInt(fillData['fillLevel']) ??
           _parseInt(fillData['fill_level']) ??
           _parseInt(fillData['level']) ??
           _parseInt(fillData['percentage']) ??
@@ -904,8 +891,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
 
     // Method 2: Check direct fields
     if (fillLevel == null) {
-      fillLevel =
-          _parseInt(data['fillLevel']) ??
+      fillLevel = _parseInt(data['fillLevel']) ??
           _parseInt(data['fill_level']) ??
           _parseInt(data['level']) ??
           _parseInt(data['percentage']) ??
@@ -922,8 +908,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         data['sensor_data'] != null &&
         data['sensor_data'] is Map) {
       final sensorData = data['sensor_data'] as Map<String, dynamic>;
-      fillLevel =
-          _parseInt(sensorData['fillLevel']) ??
+      fillLevel = _parseInt(sensorData['fillLevel']) ??
           _parseInt(sensorData['fill_level']) ??
           _parseInt(sensorData['level']);
 
@@ -941,8 +926,7 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
         final latestReading = readings.last;
         if (latestReading is Map) {
           final readingMap = latestReading as Map<String, dynamic>;
-          fillLevel =
-              _parseInt(readingMap['fillLevel']) ??
+          fillLevel = _parseInt(readingMap['fillLevel']) ??
               _parseInt(readingMap['fill_level']) ??
               _parseInt(readingMap['level']);
 
@@ -1018,150 +1002,147 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
     double lng,
     int? routeNumber,
   ) {
-    String levelText =
-        fillLevel >= 70
-            ? 'HIGH'
-            : fillLevel >= 40
+    String levelText = fillLevel >= 70
+        ? 'HIGH'
+        : fillLevel >= 40
             ? 'MEDIUM'
             : 'LOW';
-    Color levelColor =
-        fillLevel >= 70
-            ? Colors.red
-            : fillLevel >= 40
+    Color levelColor = fillLevel >= 70
+        ? Colors.red
+        : fillLevel >= 40
             ? Colors.orange
             : Colors.green;
 
     showModalBottomSheet(
       context: context,
-      builder:
-          (context) => Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.delete_outline, color: levelColor, size: 24),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        routeNumber != null
-                            ? 'Stop #$routeNumber: $binId'
-                            : 'Smart Bin: $binId',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: levelColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        levelText,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: levelColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Fill Level: $fillLevel%',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: fillLevel / 100,
-                  backgroundColor: Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(levelColor),
-                  minHeight: 8,
-                ),
-                const SizedBox(height: 12),
-                Text('Status: $status', style: const TextStyle(fontSize: 16)),
-                Text(
-                  'Location: $address',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                if (routeNumber != null) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.route,
-                          color: Colors.blue.shade700,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'In optimized route (Stop #$routeNumber)',
-                          style: TextStyle(
-                            color: Colors.blue.shade700,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                Icon(Icons.delete_outline, color: levelColor, size: 24),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    routeNumber != null
+                        ? 'Stop #$routeNumber: $binId'
+                        : 'Smart Bin: $binId',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          if (_mapController != null) {
-                            _mapController!.animateCamera(
-                              CameraUpdate.newLatLngZoom(LatLng(lat, lng), 17),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.center_focus_strong),
-                        label: const Text('Center on Map'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                        ),
-                      ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: levelColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    levelText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: levelColor,
                     ),
-                    if (fillLevel >= 40) ...[
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _addBinToRoute(binId, lat, lng);
-                        },
-                        icon: const Icon(Icons.add_road),
-                        label: const Text('Add to Route'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 12),
+            Text(
+              'Fill Level: $fillLevel%',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: fillLevel / 100,
+              backgroundColor: Colors.grey.shade300,
+              valueColor: AlwaysStoppedAnimation<Color>(levelColor),
+              minHeight: 8,
+            ),
+            const SizedBox(height: 12),
+            Text('Status: $status', style: const TextStyle(fontSize: 16)),
+            Text(
+              'Location: $address',
+              style: const TextStyle(fontSize: 16),
+            ),
+            if (routeNumber != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.route,
+                      color: Colors.blue.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'In optimized route (Stop #$routeNumber)',
+                      style: TextStyle(
+                        color: Colors.blue.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      if (_mapController != null) {
+                        _mapController!.animateCamera(
+                          CameraUpdate.newLatLngZoom(LatLng(lat, lng), 17),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.center_focus_strong),
+                    label: const Text('Center on Map'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                    ),
+                  ),
+                ),
+                if (fillLevel >= 40) ...[
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _addBinToRoute(binId, lat, lng);
+                    },
+                    icon: const Icon(Icons.add_road),
+                    label: const Text('Add to Route'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1318,283 +1299,278 @@ class _RouteMapScreenState extends State<RouteMapScreen> {
           ),
         ],
       ),
-      body:
-          _isLoading
-              ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF42A5F5)),
-              )
-              : Column(
-                children: [
-                  // Route optimization info panel
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.blue.shade50, Colors.white],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF42A5F5)),
+            )
+          : Column(
+              children: [
+                // Route optimization info panel
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade50, Colors.white],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade100,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.local_shipping,
-                                color: Colors.blue.shade600,
-                                size: 24,
-                              ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade100,
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Optimized Route',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue.shade700,
-                                    ),
+                            child: Icon(
+                              Icons.local_shipping,
+                              color: Colors.blue.shade600,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Optimized Route',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade700,
                                   ),
-                                  Text(
-                                    '$binsNeedingCollection bins • $_estimatedRouteTime • ${_totalRouteDistance.toStringAsFixed(1)} km',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
+                                ),
+                                Text(
+                                  '$binsNeedingCollection bins • $_estimatedRouteTime • ${_totalRouteDistance.toStringAsFixed(1)} km',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
                                   ),
-                                ],
-                              ),
-                            ),
-                            if (highPriorityBins > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade100,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.priority_high,
-                                      color: Colors.red.shade700,
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '$highPriorityBins HIGH',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.red.shade700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              _isLocationLoading
-                                  ? Icons.gps_not_fixed
-                                  : Icons.gps_fixed,
-                              size: 14,
-                              color:
-                                  _isLocationLoading
-                                      ? Colors.orange
-                                      : Colors.green,
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _locationStatus,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color:
-                                    _isLocationLoading
-                                        ? Colors.orange
-                                        : Colors.green,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const Spacer(),
+                          ),
+                          if (highPriorityBins > 0)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
+                                horizontal: 8,
+                                vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.green.shade100,
-                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.red.shade100,
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    Icons.update,
-                                    color: Colors.green.shade700,
-                                    size: 12,
+                                    Icons.priority_high,
+                                    color: Colors.red.shade700,
+                                    size: 14,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'Auto-refresh 5s',
+                                    '$highPriorityBins HIGH',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.green.shade700,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red.shade700,
                                     ),
                                   ),
                                 ],
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            _isLocationLoading
+                                ? Icons.gps_not_fixed
+                                : Icons.gps_fixed,
+                            size: 14,
+                            color: _isLocationLoading
+                                ? Colors.orange
+                                : Colors.green,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _locationStatus,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _isLocationLoading
+                                  ? Colors.orange
+                                  : Colors.green,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.update,
+                                  color: Colors.green.shade700,
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Auto-refresh 5s',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.green.shade700,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Map
+                Expanded(
+                  child: Stack(
+                    children: [
+                      GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: _currentLocation != null
+                              ? LatLng(
+                                  _currentLocation!.latitude!,
+                                  _currentLocation!.longitude!,
+                                )
+                              : _defaultLocation,
+                          zoom: 13,
+                        ),
+                        markers: _markers,
+                        polylines: _polylines,
+                        onMapCreated: (controller) {
+                          _mapController = controller;
+                          Future.delayed(
+                            const Duration(milliseconds: 500),
+                            _fitMarkersInView,
+                          );
+                        },
+                        myLocationEnabled: false,
+                        myLocationButtonEnabled: false,
+                        trafficEnabled: true,
+                        mapType: MapType.normal,
+                        compassEnabled: true,
+                      ),
+
+                      // Map controls
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: Column(
+                          children: [
+                            FloatingActionButton.small(
+                              heroTag: 'optimize',
+                              onPressed: () {
+                                _optimizeCollectionRoute();
+                                _fitMarkersInView();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Route optimized!'),
+                                    backgroundColor: Colors.blue,
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              backgroundColor: Colors.white,
+                              child: const Icon(
+                                Icons.route,
+                                color: Colors.blue,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            FloatingActionButton.small(
+                              heroTag: 'fit',
+                              onPressed: _fitMarkersInView,
+                              backgroundColor: Colors.white,
+                              child: const Icon(
+                                Icons.fit_screen,
+                                color: Colors.blue,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
 
-                  // Map
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        GoogleMap(
-                          initialCameraPosition: CameraPosition(
-                            target:
-                                _currentLocation != null
-                                    ? LatLng(
-                                      _currentLocation!.latitude!,
-                                      _currentLocation!.longitude!,
-                                    )
-                                    : _defaultLocation,
-                            zoom: 13,
-                          ),
-                          markers: _markers,
-                          polylines: _polylines,
-                          onMapCreated: (controller) {
-                            _mapController = controller;
-                            Future.delayed(
-                              const Duration(milliseconds: 500),
-                              _fitMarkersInView,
-                            );
-                          },
-                          myLocationEnabled: false,
-                          myLocationButtonEnabled: false,
-                          trafficEnabled: true,
-                          mapType: MapType.normal,
-                          compassEnabled: true,
-                        ),
-
-                        // Map controls
+                      // Route statistics overlay
+                      if (_optimizedRoute.isNotEmpty)
                         Positioned(
-                          top: 16,
+                          bottom: 16,
+                          left: 16,
                           right: 16,
-                          child: Column(
-                            children: [
-                              FloatingActionButton.small(
-                                heroTag: 'optimize',
-                                onPressed: () {
-                                  _optimizeCollectionRoute();
-                                  _fitMarkersInView();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Route optimized!'),
-                                      backgroundColor: Colors.blue,
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                backgroundColor: Colors.white,
-                                child: const Icon(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildStatItem(
+                                  Icons.delete,
+                                  '$binsNeedingCollection',
+                                  'Bins',
+                                  Colors.blue,
+                                ),
+                                _buildStatItem(
                                   Icons.route,
-                                  color: Colors.blue,
+                                  '${_totalRouteDistance.toStringAsFixed(1)} km',
+                                  'Distance',
+                                  Colors.orange,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              FloatingActionButton.small(
-                                heroTag: 'fit',
-                                onPressed: _fitMarkersInView,
-                                backgroundColor: Colors.white,
-                                child: const Icon(
-                                  Icons.fit_screen,
-                                  color: Colors.blue,
+                                _buildStatItem(
+                                  Icons.access_time,
+                                  _estimatedRouteTime,
+                                  'Time',
+                                  Colors.green,
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Route statistics overlay
-                        if (_optimizedRoute.isNotEmpty)
-                          Positioned(
-                            bottom: 16,
-                            left: 16,
-                            right: 16,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceAround,
-                                children: [
-                                  _buildStatItem(
-                                    Icons.delete,
-                                    '$binsNeedingCollection',
-                                    'Bins',
-                                    Colors.blue,
-                                  ),
-                                  _buildStatItem(
-                                    Icons.route,
-                                    '${_totalRouteDistance.toStringAsFixed(1)} km',
-                                    'Distance',
-                                    Colors.orange,
-                                  ),
-                                  _buildStatItem(
-                                    Icons.access_time,
-                                    _estimatedRouteTime,
-                                    'Time',
-                                    Colors.green,
-                                  ),
-                                ],
-                              ),
+                              ],
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
     );
   }
 

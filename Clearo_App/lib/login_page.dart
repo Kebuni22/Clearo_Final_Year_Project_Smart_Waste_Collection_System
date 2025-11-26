@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dashboard_page.dart';
 import 'signup_page.dart';
 import 'Driver/driver_dashboard_page.dart';
+import 'services/firestore_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -75,45 +76,50 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      final UserCredential userCredential = await _auth
-          .signInWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+      final UserCredential userCredential =
+          await _auth.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
       final user = userCredential.user;
-      if (user != null) {
-        final DocumentSnapshot userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
+      if (user == null) throw Exception('User authentication failed');
 
-        if (userDoc.exists) {
-          final data = userDoc.data() as Map<String, dynamic>;
-          final String? position = data['position'];
-          final String? userType = data['userType'];
-          final String name =
-              data['name'] ?? user.email?.split('@')[0] ?? 'User';
+      // Use the safe service
+      final userData = await FirestoreService.getUserData(user.uid);
 
-          if (mounted) {
-            if (userType == 'driver') {
-              // Request location permission for drivers
-              await _handleDriverLocationSetup(user.uid, name);
-            } else {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) =>
-                          DashboardPage(userName: name, showLoginMessage: true),
-                ),
-              );
-            }
-          }
+      if (userData == null) {
+        if (mounted) {
+          _showErrorSnackBar('User profile not found. Please contact support.');
         }
+        return;
       }
+
+      final String? userType = userData['userType'];
+      final String name =
+          userData['name'] ?? user.email?.split('@')[0] ?? 'User';
+
+      if (!mounted) return;
+
+      if (userType == 'driver') {
+        await _handleDriverLocationSetup(user.uid, name);
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DashboardPage(
+              userName: name,
+              showLoginMessage: true,
+            ),
+          ),
+        );
+      }
+    } on TimeoutException catch (e) {
+      print('Timeout error: $e');
+      _showErrorSnackBar(
+          'Connection timeout. Please check your internet and try again.');
     } on FirebaseAuthException catch (e) {
+      print('Firebase Auth error: ${e.code} - ${e.message}');
       String message;
       switch (e.code) {
         case 'user-not-found':
@@ -131,12 +137,23 @@ class _LoginPageState extends State<LoginPage> {
         case 'too-many-requests':
           message = 'Too many attempts. Please try again later';
           break;
+        case 'invalid-credential':
+          message = 'Invalid email or password';
+          break;
+        case 'network-request-failed':
+          message = 'Network error. Please check your connection';
+          break;
         default:
           message = 'Login failed: ${e.message}';
       }
       _showErrorSnackBar(message);
-    } catch (e) {
-      _showErrorSnackBar('Error: $e');
+    } on FirebaseException catch (e) {
+      print('Firestore error: ${e.code} - ${e.message}');
+      _showErrorSnackBar('Database error: ${e.message}');
+    } catch (e, stackTrace) {
+      print('Unexpected error: $e');
+      print('Stack trace: $stackTrace');
+      _showErrorSnackBar('An unexpected error occurred. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -510,10 +527,9 @@ class _LoginPageState extends State<LoginPage> {
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder:
-                                  (context) => DriverDashboardPage(
-                                    driverName: driverName,
-                                  ),
+                              builder: (context) => DriverDashboardPage(
+                                driverName: driverName,
+                              ),
                             ),
                           );
                         },
@@ -574,14 +590,14 @@ class _LoginPageState extends State<LoginPage> {
           .collection('driver_locations')
           .doc(userId)
           .set({
-            'latitude': locationData.latitude,
-            'longitude': locationData.longitude,
-            'heading': locationData.heading ?? 0.0,
-            'speed': locationData.speed ?? 0.0,
-            'accuracy': locationData.accuracy ?? 0.0,
-            'timestamp': FieldValue.serverTimestamp(),
-            'isOnline': true,
-          }, SetOptions(merge: true));
+        'latitude': locationData.latitude,
+        'longitude': locationData.longitude,
+        'heading': locationData.heading ?? 0.0,
+        'speed': locationData.speed ?? 0.0,
+        'accuracy': locationData.accuracy ?? 0.0,
+        'timestamp': FieldValue.serverTimestamp(),
+        'isOnline': true,
+      }, SetOptions(merge: true));
 
       // Also update the user document
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
@@ -925,30 +941,30 @@ class _LoginPageState extends State<LoginPage> {
                         // Login Button
                         _isLoading
                             ? const Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.teal,
-                              ),
-                            )
+                                child: CircularProgressIndicator(
+                                  color: Colors.teal,
+                                ),
+                              )
                             : ElevatedButton(
-                              onPressed: _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
+                                onPressed: _login,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                child: Text(
+                                  _getText('login'),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
-                              child: Text(
-                                _getText('login'),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
                         const SizedBox(height: 24),
 
                         // Sign Up Redirect
@@ -980,109 +996,108 @@ class _LoginPageState extends State<LoginPage> {
                           onTap: () {
                             showDialog(
                               context: context,
-                              builder:
-                                  (context) => AlertDialog(
-                                    title: const Text(
-                                      'Terms of Service & Privacy Policy',
-                                    ),
-                                    content: const SingleChildScrollView(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '🌟 Terms of Service\n',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                          Text(
-                                            'Welcome to Clearo!\n\n'
-                                            'Clearo is dedicated to turning waste into worth by offering smart, sustainable, and community-driven waste collection solutions. '
-                                            'With a focus on technology and togetherness, we aim to build a cleaner and greener Sri Lanka.\n\n'
-                                            '🚀 What Clearo Offers:\n'
-                                            '• 🛻 Real-time waste truck and bin tracking\n'
-                                            '• 📅 Immediate waste pickup scheduling\n'
-                                            '• 📍 Optimized waste collection route planning\n'
-                                            '• 🔁 Share reusable items with the community\n'
-                                            '• 📷 Upload photos & descriptions of reusable goods\n'
-                                            '• 📊 Track your environmental contributions\n'
-                                            '• 🧠 Waste segregation guidance\n'
-                                            '• 🧾 Smart mapping and reporting features\n'
-                                            '• 🚨 Citizen reporting for illegal dumping or bin issues\n'
-                                            '• 📢 Community cleanup event notifications\n'
-                                            '• 🦟 Dengue awareness updates in your area\n'
-                                            '• 🌐 Multilingual support for inclusive access\n'
-                                            '• 💬 Community feedback and suggestion hub\n\n'
-                                            '❤️ Why We Built Clearo:\n'
-                                            'Sri Lanka faces rising challenges in managing urban and suburban waste effectively. Overflowing bins, unoptimized truck routes, lack of community awareness, and communication gaps between citizens and municipalities contribute to environmental and health issues.\n\n'
-                                            'We chose to build Clearo because we believe:\n'
-                                            '• Technology can simplify complex waste collection processes\n'
-                                            '• Communities play a key role in responsible disposal\n'
-                                            '• Everyone deserves access to clean surroundings\n'
-                                            '• Reusability and sustainability should be encouraged\n'
-                                            '• Real-time visibility leads to better decision-making\n\n'
-                                            '🌱 Your Impact as a Clearo User:\n'
-                                            'By using Clearo, you’re helping to:\n'
-                                            '• Keep your neighborhood clean\n'
-                                            '• Promote reuse over discard\n'
-                                            '• Optimize collection efforts and reduce pollution\n'
-                                            '• Raise awareness of proper waste segregation\n'
-                                            '• Prevent mosquito-borne diseases like dengue\n'
-                                            '• Build a smarter and greener Sri Lanka, together\n\n'
-                                            '💡 Did you know?\n'
-                                            'Your contributions and participation are recorded in the app so you can **track your positive impact on the environment** and receive **recognition** for your efforts!\n\n'
-                                            '🔎 Need Help?\n'
-                                            'Visit our website or reach out to our support team—we\'re here to help!\n\n'
-                                            '🌟 Let’s revolutionize waste collection—one bin, one truck, one smart action at a time.\n\n'
-                                            '💚 Thank you for being a part of Clearo.\n\n',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                          SizedBox(height: 18),
-                                          Text(
-                                            '🔒 Privacy Policy\n',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                          Text(
-                                            'At Clearo, we value your privacy and are committed to protecting your personal information. '
-                                            'This Privacy Policy outlines how we collect, use, and safeguard your data:\n\n'
-                                            '1. Data Collection:\n'
-                                            '   - We collect your email, name, and location to provide personalized services.\n'
-                                            '   - Usage data is collected to improve app performance and user experience.\n\n'
-                                            '2. Data Usage:\n'
-                                            '   - Your data is used for scheduling pickups, tracking contributions, and sending notifications.\n'
-                                            '   - We do not sell or share your data with third parties without your consent.\n\n'
-                                            '3. Data Security:\n'
-                                            '   - We implement robust security measures to protect your data from unauthorized access.\n\n'
-                                            '4. Your Rights:\n'
-                                            '   - You can request access to your data or ask for its deletion at any time.\n\n'
-                                            'For more details, please visit our website or contact our support team.\n\n'
-                                            '💚 Thank you for trusting Clearo to manage your waste responsibly!',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ],
+                              builder: (context) => AlertDialog(
+                                title: const Text(
+                                  'Terms of Service & Privacy Policy',
+                                ),
+                                content: const SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '🌟 Terms of Service\n',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                        ),
                                       ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed:
-                                            () => Navigator.of(context).pop(),
-                                        child: const Text('Close'),
+                                      Text(
+                                        'Welcome to Clearo!\n\n'
+                                        'Clearo is dedicated to turning waste into worth by offering smart, sustainable, and community-driven waste collection solutions. '
+                                        'With a focus on technology and togetherness, we aim to build a cleaner and greener Sri Lanka.\n\n'
+                                        '🚀 What Clearo Offers:\n'
+                                        '• 🛻 Real-time waste truck and bin tracking\n'
+                                        '• 📅 Immediate waste pickup scheduling\n'
+                                        '• 📍 Optimized waste collection route planning\n'
+                                        '• 🔁 Share reusable items with the community\n'
+                                        '• 📷 Upload photos & descriptions of reusable goods\n'
+                                        '• 📊 Track your environmental contributions\n'
+                                        '• 🧠 Waste segregation guidance\n'
+                                        '• 🧾 Smart mapping and reporting features\n'
+                                        '• 🚨 Citizen reporting for illegal dumping or bin issues\n'
+                                        '• 📢 Community cleanup event notifications\n'
+                                        '• 🦟 Dengue awareness updates in your area\n'
+                                        '• 🌐 Multilingual support for inclusive access\n'
+                                        '• 💬 Community feedback and suggestion hub\n\n'
+                                        '❤️ Why We Built Clearo:\n'
+                                        'Sri Lanka faces rising challenges in managing urban and suburban waste effectively. Overflowing bins, unoptimized truck routes, lack of community awareness, and communication gaps between citizens and municipalities contribute to environmental and health issues.\n\n'
+                                        'We chose to build Clearo because we believe:\n'
+                                        '• Technology can simplify complex waste collection processes\n'
+                                        '• Communities play a key role in responsible disposal\n'
+                                        '• Everyone deserves access to clean surroundings\n'
+                                        '• Reusability and sustainability should be encouraged\n'
+                                        '• Real-time visibility leads to better decision-making\n\n'
+                                        '🌱 Your Impact as a Clearo User:\n'
+                                        'By using Clearo, you’re helping to:\n'
+                                        '• Keep your neighborhood clean\n'
+                                        '• Promote reuse over discard\n'
+                                        '• Optimize collection efforts and reduce pollution\n'
+                                        '• Raise awareness of proper waste segregation\n'
+                                        '• Prevent mosquito-borne diseases like dengue\n'
+                                        '• Build a smarter and greener Sri Lanka, together\n\n'
+                                        '💡 Did you know?\n'
+                                        'Your contributions and participation are recorded in the app so you can **track your positive impact on the environment** and receive **recognition** for your efforts!\n\n'
+                                        '🔎 Need Help?\n'
+                                        'Visit our website or reach out to our support team—we\'re here to help!\n\n'
+                                        '🌟 Let’s revolutionize waste collection—one bin, one truck, one smart action at a time.\n\n'
+                                        '💚 Thank you for being a part of Clearo.\n\n',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      SizedBox(height: 18),
+                                      Text(
+                                        '🔒 Privacy Policy\n',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                      Text(
+                                        'At Clearo, we value your privacy and are committed to protecting your personal information. '
+                                        'This Privacy Policy outlines how we collect, use, and safeguard your data:\n\n'
+                                        '1. Data Collection:\n'
+                                        '   - We collect your email, name, and location to provide personalized services.\n'
+                                        '   - Usage data is collected to improve app performance and user experience.\n\n'
+                                        '2. Data Usage:\n'
+                                        '   - Your data is used for scheduling pickups, tracking contributions, and sending notifications.\n'
+                                        '   - We do not sell or share your data with third parties without your consent.\n\n'
+                                        '3. Data Security:\n'
+                                        '   - We implement robust security measures to protect your data from unauthorized access.\n\n'
+                                        '4. Your Rights:\n'
+                                        '   - You can request access to your data or ask for its deletion at any time.\n\n'
+                                        'For more details, please visit our website or contact our support team.\n\n'
+                                        '💚 Thank you for trusting Clearo to manage your waste responsibly!',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.black87,
+                                        ),
                                       ),
                                     ],
                                   ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
+                                    child: const Text('Close'),
+                                  ),
+                                ],
+                              ),
                             );
                           },
                           child: Text(

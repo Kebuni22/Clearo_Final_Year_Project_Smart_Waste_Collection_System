@@ -25,6 +25,8 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
   String? pickupTime;
   DateTime? selectedDate; // Add selected date variable
   final TextEditingController _instructionsController = TextEditingController();
+  final TextEditingController _reasonController =
+      TextEditingController(); // Add reason controller
 
   // Modern color palette
   final Color _primaryColor = const Color(0xFF8FD3A9);
@@ -49,11 +51,10 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
       }
 
       // Fetch user's home number from Firestore
-      final userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
 
       final homeNumber = userDoc.data()?['homeNumber'];
       if (homeNumber == null) {
@@ -61,26 +62,24 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
       }
 
       // Fetch bins associated with the user's home number
-      final querySnapshot =
-          await FirebaseFirestore.instance
-              .collection('bins')
-              .where('homeNumber', isEqualTo: homeNumber)
-              .get();
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('bins')
+          .where('homeNumber', isEqualTo: homeNumber)
+          .get();
 
       if (querySnapshot.docs.isEmpty) {
         throw Exception('No bins found for the user\'s home number.');
       }
 
       setState(() {
-        _userBins =
-            querySnapshot.docs.map((doc) {
-              final data = doc.data();
-              return {
-                'id': doc.id,
-                'binId': data['binId'], // Use binId directly from the database
-                'status': data['status'] ?? 'Available',
-              };
-            }).toList();
+        _userBins = querySnapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'id': doc.id,
+            'binId': data['binId'], // Use binId directly from the database
+            'status': data['status'] ?? 'Available',
+          };
+        }).toList();
       });
     } catch (e) {
       _showErrorDialog('Error fetching bins: $e');
@@ -90,6 +89,10 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
   void _nextStep() {
     if (_currentStep == 0 && selectedBins.isEmpty) {
       _showErrorDialog('Please select at least one bin.');
+      return;
+    }
+    if (_currentStep == 0 && _reasonController.text.trim().isEmpty) {
+      _showErrorDialog('Please provide a reason for immediate pickup.');
       return;
     }
     if (_currentStep == 1 &&
@@ -119,51 +122,50 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder:
-          (context) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.error_outline, size: 48, color: _errorColor),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Oops!',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: _errorColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _errorColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('UNDERSTOOD'),
-                    ),
-                  ),
-                ],
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: _errorColor),
+              const SizedBox(height: 16),
+              Text(
+                'Oops!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _errorColor,
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _errorColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('UNDERSTOOD'),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -191,9 +193,10 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
       // Save pickup details as a single entry for multiple bins
       final pickupData = {
         'userId': user.uid,
-        'bins': selectedBins, // Save as array of bins
+        'bins': selectedBins,
         'pickupTime': pickupTime,
         'pickupDate': formattedDate,
+        'reason': _reasonController.text.trim(), // Add reason field
         'instructions': _instructionsController.text.trim(),
         'paymentMethod': selectedPaymentMethod,
         'status': 'Pending',
@@ -227,43 +230,40 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
       }
 
       // Remove orderBy to avoid requiring a composite index
-      final querySnapshot =
-          await FirebaseFirestore.instance
-              .collection('immediate_pickups')
-              .where('userId', isEqualTo: user.uid)
-              .get();
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('immediate_pickups')
+          .where('userId', isEqualTo: user.uid)
+          .get();
 
-      List<Map<String, dynamic>> pickups =
-          querySnapshot.docs.map((doc) {
-            final data = doc.data();
-            // Handle both old format (single bin) and new format (multiple bins)
-            List<dynamic> binsList = [];
-            if (data['bins'] != null) {
-              binsList = data['bins'];
-            } else if (data['bin'] != null) {
-              binsList = [data['bin']];
-            }
+      List<Map<String, dynamic>> pickups = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        // Handle both old format (single bin) and new format (multiple bins)
+        List<dynamic> binsList = [];
+        if (data['bins'] != null) {
+          binsList = data['bins'];
+        } else if (data['bin'] != null) {
+          binsList = [data['bin']];
+        }
 
-            return {
-              'id': doc.id,
-              'bins': binsList,
-              'pickupTime': data['pickupTime'] ?? '--',
-              'pickupDate':
-                  data['pickupDate'] ??
-                  (data['timestamp'] != null
-                      ? (data['timestamp'] as Timestamp)
-                          .toDate()
-                          .toString()
-                          .split(' ')[0]
-                      : '--'),
-              'status': data['status'] ?? 'Pending',
-              'instructions': data['instructions'] ?? '',
-              'paymentMethod': data['paymentMethod'] ?? '--',
-              'totalAmount': data['totalAmount'] ?? (binsList.length * 480),
-              'binCount': data['binCount'] ?? binsList.length,
-              'timestamp': data['timestamp'],
-            };
-          }).toList();
+        return {
+          'id': doc.id,
+          'bins': binsList,
+          'pickupTime': data['pickupTime'] ?? '--',
+          'pickupDate': data['pickupDate'] ??
+              (data['timestamp'] != null
+                  ? (data['timestamp'] as Timestamp)
+                      .toDate()
+                      .toString()
+                      .split(' ')[0]
+                  : '--'),
+          'status': data['status'] ?? 'Pending',
+          'instructions': data['instructions'] ?? '',
+          'paymentMethod': data['paymentMethod'] ?? '--',
+          'totalAmount': data['totalAmount'] ?? (binsList.length * 480),
+          'binCount': data['binCount'] ?? binsList.length,
+          'timestamp': data['timestamp'],
+        };
+      }).toList();
 
       // Sort by timestamp in Dart instead of Firestore
       pickups.sort((a, b) {
@@ -305,16 +305,15 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Center(
-                      child:
-                          isCompleted
-                              ? Icon(Icons.check, color: Colors.white, size: 20)
-                              : Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  color: isActive ? Colors.white : Colors.grey,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      child: isCompleted
+                          ? Icon(Icons.check, color: Colors.white, size: 20)
+                          : Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                color: isActive ? Colors.white : Colors.grey,
+                                fontWeight: FontWeight.bold,
                               ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -539,6 +538,7 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                   pickupTime = null;
                   selectedDate = null; // Reset selected date
                   _instructionsController.clear();
+                  _reasonController.clear(); // Clear reason field
                   _isRequestView = true;
                 });
               },
@@ -636,6 +636,7 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
     _isProcessingPayment = false;
     pickupTime = null;
     selectedDate = null;
+    _reasonController.clear(); // Clear reason field
     _instructionsController.clear();
     _currentStep = 0;
   }
@@ -808,10 +809,9 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                                 : 'Select pickup date',
                             style: TextStyle(
                               fontSize: 16,
-                              color:
-                                  selectedDate != null
-                                      ? _darkColor
-                                      : Colors.grey.shade500,
+                              color: selectedDate != null
+                                  ? _darkColor
+                                  : Colors.grey.shade500,
                             ),
                           ),
                         ),
@@ -963,6 +963,237 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
     }
   }
 
+  Widget _buildStepContent() {
+    switch (_currentStep) {
+      case 0:
+        return _buildBinSelectionStep();
+      case 1:
+        return _buildPaymentStep();
+      case 2:
+        return _buildTimeSelectionStep();
+      case 3:
+        return _buildConfirmationStep();
+      default:
+        return Container();
+    }
+  }
+
+  Widget _buildBinSelectionStep() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select Bins',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: _darkColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Choose which bins you want to schedule for pickup',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 24),
+          if (_userBins.isEmpty)
+            Center(
+              child: Column(
+                children: [
+                  CircularProgressIndicator(color: _primaryColor),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading your bins...',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              children: _userBins.map((bin) {
+                final binId = bin['binId'];
+                final isSelected = selectedBins.contains(binId);
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          selectedBins.remove(binId);
+                        } else {
+                          selectedBins.add(binId);
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? _primaryColor.withOpacity(0.1)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color:
+                              isSelected ? _primaryColor : Colors.grey.shade300,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? _primaryColor
+                                  : _primaryColor.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.delete,
+                              color: isSelected ? Colors.white : _primaryColor,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  binId,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color:
+                                        isSelected ? _primaryColor : _darkColor,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                Text(
+                                  bin['status'] ?? 'Available',
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? _primaryColor
+                                        : Colors.grey.shade600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(Icons.check_circle, color: _primaryColor)
+                          else
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.grey.shade400,
+                                  width: 2,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          if (selectedBins.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _accentColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _accentColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.calculate, color: _accentColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Total: ${selectedBins.length} bin${selectedBins.length > 1 ? 's' : ''} × Rs. 480 = Rs. ${selectedBins.length * 480}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _accentColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Reason input field
+            Text(
+              'Reason for Immediate Pickup',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _darkColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: TextField(
+                controller: _reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText:
+                      'E.g., Bins are full, urgent waste removal needed, pest control, special event...',
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 14,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.all(16),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8, top: 12),
+                    child: Icon(Icons.edit_note, color: _primaryColor),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _darkColor,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.grey.shade500),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Help us understand why you need immediate pickup',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildConfirmationStep() {
     return SingleChildScrollView(
       child: Column(
@@ -1005,31 +1236,30 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children:
-                      selectedBins
-                          .map(
-                            (binId) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _primaryColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: _primaryColor.withOpacity(0.3),
-                                ),
-                              ),
-                              child: Text(
-                                binId,
-                                style: TextStyle(
-                                  color: _primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                  children: selectedBins
+                      .map(
+                        (binId) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _primaryColor.withOpacity(0.3),
                             ),
-                          )
-                          .toList(),
+                          ),
+                          child: Text(
+                            binId,
+                            style: TextStyle(
+                              color: _primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
               ],
             ),
@@ -1068,6 +1298,42 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                   'Total Amount',
                   'Rs. ${selectedBins.length * 480}.00',
                 ),
+                if (_reasonController.text.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Reason for Immediate Pickup:',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.priority_high,
+                          color: Colors.orange.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _reasonController.text,
+                            style: TextStyle(
+                              color: Colors.orange.shade800,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (_instructionsController.text.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -1121,191 +1387,6 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
     );
   }
 
-  Widget _buildStepContent() {
-    switch (_currentStep) {
-      case 0:
-        return _buildBinSelectionStep();
-      case 1:
-        return _buildPaymentStep();
-      case 2:
-        return _buildTimeSelectionStep();
-      case 3:
-        return _buildConfirmationStep();
-      default:
-        return Container();
-    }
-  }
-
-  Widget _buildBinSelectionStep() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select Bins',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: _darkColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Choose which bins you want to schedule for pickup',
-            style: TextStyle(color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 24),
-          if (_userBins.isEmpty)
-            Center(
-              child: Column(
-                children: [
-                  CircularProgressIndicator(color: _primaryColor),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading your bins...',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            )
-          else
-            Column(
-              children:
-                  _userBins.map((bin) {
-                    final binId = bin['binId'];
-                    final isSelected = selectedBins.contains(binId);
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            if (isSelected) {
-                              selectedBins.remove(binId);
-                            } else {
-                              selectedBins.add(binId);
-                            }
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color:
-                                isSelected
-                                    ? _primaryColor.withOpacity(0.1)
-                                    : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color:
-                                  isSelected
-                                      ? _primaryColor
-                                      : Colors.grey.shade300,
-                              width: isSelected ? 2 : 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color:
-                                      isSelected
-                                          ? _primaryColor
-                                          : _primaryColor.withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.delete,
-                                  color:
-                                      isSelected ? Colors.white : _primaryColor,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      binId,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            isSelected
-                                                ? _primaryColor
-                                                : _darkColor,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      bin['status'] ?? 'Available',
-                                      style: TextStyle(
-                                        color:
-                                            isSelected
-                                                ? _primaryColor
-                                                : Colors.grey.shade600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (isSelected)
-                                Icon(Icons.check_circle, color: _primaryColor)
-                              else
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Colors.grey.shade400,
-                                      width: 2,
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-            ),
-          if (selectedBins.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _accentColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _accentColor.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.calculate, color: _accentColor),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Total: ${selectedBins.length} bin${selectedBins.length > 1 ? 's' : ''} × Rs. 480 = Rs. ${selectedBins.length * 480}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: _accentColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ...existing code...
-
   void _editPickup(Map<String, dynamic> pickup) {
     setState(() {
       final bins = pickup['bins'] as List<dynamic>? ?? [];
@@ -1322,6 +1403,8 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
         }
       }
 
+      _reasonController.text =
+          pickup['reason']?.toString() ?? ''; // Load reason
       _instructionsController.text = pickup['instructions']?.toString() ?? '';
       _currentStep = 0;
       _isRequestView = true;
@@ -1332,44 +1415,43 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
     try {
       final confirm = await showDialog<bool>(
         context: context,
-        builder:
-            (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Text(
-                'Delete Pickup',
-                style: TextStyle(
-                  color: _darkColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: const Text(
-                'Are you sure you want to delete this pickup request?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'Delete',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Delete Pickup',
+            style: TextStyle(
+              color: _darkColor,
+              fontWeight: FontWeight.bold,
             ),
+          ),
+          content: const Text(
+            'Are you sure you want to delete this pickup request?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       );
 
       if (confirm == true) {
@@ -1570,32 +1652,31 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 4,
-                    children:
-                        binIds
-                            .map(
-                              (binId) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _primaryColor.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _primaryColor.withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Text(
-                                  binId,
-                                  style: TextStyle(
-                                    color: _primaryColor,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                    children: binIds
+                        .map(
+                          (binId) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _primaryColor.withOpacity(0.3),
                               ),
-                            )
-                            .toList(),
+                            ),
+                            child: Text(
+                              binId,
+                              style: TextStyle(
+                                color: _primaryColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ),
@@ -1609,6 +1690,52 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
             _buildDetailRow('Payment', pickup['paymentMethod']),
             _buildDetailRow('Amount', 'Rs. ${pickup['totalAmount']}.00'),
 
+            // Reason display
+            if (pickup['reason'] != null &&
+                pickup['reason'].toString().trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.priority_high,
+                          color: Colors.orange.shade700,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Reason:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      pickup['reason'].toString(),
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Special instructions if available
             if (pickup['instructions'] != null &&
                 pickup['instructions'].toString().trim().isNotEmpty) ...[
@@ -1620,26 +1747,12 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                   color: Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Special Instructions:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue.shade700,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      pickup['instructions'].toString(),
-                      style: TextStyle(
-                        color: Colors.blue.shade800,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  pickup['instructions'].toString(),
+                  style: TextStyle(
+                    color: Colors.blue.shade800,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ],
@@ -1797,58 +1910,57 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder:
-          (context) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 48, color: color),
-                  const SizedBox(height: 16),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: color,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text(
-                        'CONTINUE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 48, color: color),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text(
+                    'CONTINUE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -1864,26 +1976,23 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
     final isDisabled = _isProcessingPayment && selectedPaymentMethod != method;
 
     return GestureDetector(
-      onTap:
-          (_isProcessingPayment || paymentStatus == 'Paid')
-              ? null
-              : () => _processPayment(method),
+      onTap: (_isProcessingPayment || paymentStatus == 'Paid')
+          ? null
+          : () => _processPayment(method),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color:
-              isSelected
-                  ? _primaryColor.withOpacity(0.1)
-                  : isDisabled
+          color: isSelected
+              ? _primaryColor.withOpacity(0.1)
+              : isDisabled
                   ? Colors.grey.shade100
                   : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                isSelected
-                    ? _primaryColor
-                    : isDisabled
+            color: isSelected
+                ? _primaryColor
+                : isDisabled
                     ? Colors.grey.shade300
                     : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
@@ -1895,20 +2004,18 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color:
-                    isSelected
-                        ? _primaryColor
-                        : isDisabled
+                color: isSelected
+                    ? _primaryColor
+                    : isDisabled
                         ? Colors.grey.shade300
                         : _primaryColor.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color:
-                    isSelected
-                        ? Colors.white
-                        : isDisabled
+                color: isSelected
+                    ? Colors.white
+                    : isDisabled
                         ? Colors.grey.shade500
                         : _primaryColor,
                 size: 24,
@@ -1923,10 +2030,9 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                     title,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color:
-                          isSelected
-                              ? _primaryColor
-                              : isDisabled
+                      color: isSelected
+                          ? _primaryColor
+                          : isDisabled
                               ? Colors.grey.shade500
                               : _darkColor,
                       fontSize: 16,
@@ -1937,10 +2043,9 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color:
-                            isSelected
-                                ? _primaryColor
-                                : isDisabled
+                        color: isSelected
+                            ? _primaryColor
+                            : isDisabled
                                 ? Colors.grey.shade400
                                 : Colors.grey.shade600,
                         fontSize: 14,
@@ -1975,10 +2080,9 @@ class _ImmediatePickupScreenState extends State<ImmediatePickupScreen> {
                 height: 24,
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color:
-                        isDisabled
-                            ? Colors.grey.shade300
-                            : Colors.grey.shade400,
+                    color: isDisabled
+                        ? Colors.grey.shade300
+                        : Colors.grey.shade400,
                     width: 2,
                   ),
                   shape: BoxShape.circle,

@@ -13,7 +13,7 @@ class DriverDashboardPage extends StatefulWidget {
   final String driverName;
 
   const DriverDashboardPage({Key? key, required this.driverName})
-    : super(key: key);
+      : super(key: key);
 
   @override
   State<DriverDashboardPage> createState() => _DriverDashboardPageState();
@@ -89,27 +89,26 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
       final vehiclesQuery =
           await FirebaseFirestore.instance.collection('vehicles').get();
 
-      availableVehicles =
-          vehiclesQuery.docs.map((doc) {
-            final data = doc.data();
-            return {
-              'id': doc.id,
-              'vehicleNumber': data['vehicleNumber'] ?? 'N/A',
-              'vehicleType': data['vehicleType'] ?? 'Unknown',
-              'model': data['model'] ?? 'Unknown',
-              'year': data['year']?.toString() ?? 'N/A',
-              'licensePlate': data['licensePlate'] ?? 'N/A',
-              'capacity': data['capacity'] ?? 'N/A',
-              'fuelCapacity': data['fuelCapacity']?.toString() ?? 'N/A',
-              'fuelEfficiency': data['fuelEfficiency']?.toString() ?? 'N/A',
-              'maxSpeed': data['maxSpeed']?.toString() ?? 'N/A',
-              'mileage': data['mileage']?.toString() ?? 'N/A',
-              'engineType': data['engineType'] ?? 'N/A',
-              'status': data['status'] ?? 'Available',
-              'currentDriver': data['currentDriver'] ?? '',
-              'lastMaintenance': data['lastMaintenance'] ?? 'N/A',
-            };
-          }).toList();
+      availableVehicles = vehiclesQuery.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'vehicleNumber': data['vehicleNumber'] ?? 'N/A',
+          'vehicleType': data['vehicleType'] ?? 'Unknown',
+          'model': data['model'] ?? 'Unknown',
+          'year': data['year']?.toString() ?? 'N/A',
+          'licensePlate': data['licensePlate'] ?? 'N/A',
+          'capacity': data['capacity'] ?? 'N/A',
+          'fuelCapacity': data['fuelCapacity']?.toString() ?? 'N/A',
+          'fuelEfficiency': data['fuelEfficiency']?.toString() ?? 'N/A',
+          'maxSpeed': data['maxSpeed']?.toString() ?? 'N/A',
+          'mileage': data['mileage']?.toString() ?? 'N/A',
+          'engineType': data['engineType'] ?? 'N/A',
+          'status': data['status'] ?? 'Available',
+          'currentDriver': data['currentDriver'] ?? '',
+          'lastMaintenance': data['lastMaintenance'] ?? 'N/A',
+        };
+      }).toList();
 
       // Set selected vehicle if already assigned to this driver
       final assignedVehicle = availableVehicles.firstWhere(
@@ -224,19 +223,17 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                           ),
                           title: Text(notif['title'] ?? 'Notification'),
                           subtitle: Text(notif['message'] ?? ''),
-                          trailing:
-                              notif['createdAt'] is Timestamp
-                                  ? Text(
-                                    _formatTime(
-                                      (notif['createdAt'] as Timestamp)
-                                          .toDate(),
-                                    ),
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  )
-                                  : null,
+                          trailing: notif['createdAt'] is Timestamp
+                              ? Text(
+                                  _formatTime(
+                                    (notif['createdAt'] as Timestamp).toDate(),
+                                  ),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                )
+                              : null,
                         );
                       },
                     ),
@@ -266,17 +263,15 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
 
     try {
       // Fetch driver details
-      final driverQuery =
-          await FirebaseFirestore.instance
-              .collection('drivers')
-              .where('name', isEqualTo: widget.driverName)
-              .limit(1)
-              .get();
+      final driverQuery = await FirebaseFirestore.instance
+          .collection('drivers')
+          .where('name', isEqualTo: widget.driverName)
+          .limit(1)
+          .get();
 
       if (driverQuery.docs.isNotEmpty) {
         final data = driverQuery.docs.first.data();
-        employeeNumber =
-            data['employeeNumber'] ??
+        employeeNumber = data['employeeNumber'] ??
             'DRV-${widget.driverName.substring(0, 3).toUpperCase()}001';
         truckStatus = data['status'] ?? 'Idle';
         truckCapacity = data['truckCapacity'] ?? 1000;
@@ -286,18 +281,16 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
       final today = DateTime.now();
       final todayStr =
           "${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
-      final pickupsQuery =
-          await FirebaseFirestore.instance
-              .collection('pickups')
-              .where('driverName', isEqualTo: widget.driverName)
-              .where('date', isEqualTo: todayStr)
-              .get();
+      final pickupsQuery = await FirebaseFirestore.instance
+          .collection('pickups')
+          .where('driverName', isEqualTo: widget.driverName)
+          .where('date', isEqualTo: todayStr)
+          .get();
 
-      pickups =
-          pickupsQuery.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return {...data, 'docId': doc.id};
-          }).toList();
+      pickups = pickupsQuery.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {...data, 'docId': doc.id};
+      }).toList();
 
       pickupDocIds = pickupsQuery.docs.map((doc) => doc.id).toList();
 
@@ -306,28 +299,25 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
           pickups.where((pickup) => pickup['status'] == 'Completed').length;
 
       // Fetch notifications and check for urgent bin alerts
-      final notificationsQuery =
-          await FirebaseFirestore.instance
-              .collection('driver_notifications')
-              .where('driverName', isEqualTo: widget.driverName)
-              .orderBy('createdAt', descending: true)
-              .limit(5)
-              .get();
+      final notificationsQuery = await FirebaseFirestore.instance
+          .collection('driver_notifications')
+          .where('driverName', isEqualTo: widget.driverName)
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .get();
 
-      notifications =
-          notificationsQuery.docs
-              .map((doc) => doc.data() as Map<String, dynamic>)
-              .toList();
+      notifications = notificationsQuery.docs
+          .map((doc) => doc.data() as Map<String, dynamic>)
+          .toList();
 
       // Check for critical bin full notifications from user_notifications
-      final binFullNotifications =
-          await FirebaseFirestore.instance
-              .collection('user_notifications')
-              .where('type', isEqualTo: 'bin_full')
-              .where('priority', isEqualTo: 'high')
-              .where('isRead', isEqualTo: false)
-              .limit(10)
-              .get();
+      final binFullNotifications = await FirebaseFirestore.instance
+          .collection('user_notifications')
+          .where('type', isEqualTo: 'bin_full')
+          .where('priority', isEqualTo: 'high')
+          .where('isRead', isEqualTo: false)
+          .limit(10)
+          .get();
 
       // Add urgent bin notifications to driver notifications
       for (var doc in binFullNotifications.docs) {
@@ -380,36 +370,34 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
       final today = DateTime.now();
 
       // Read from 'schedules' collection
-      final scheduleQuery =
-          await FirebaseFirestore.instance
-              .collection('schedules')
-              .where('date', isEqualTo: todayStr)
-              .get();
+      final scheduleQuery = await FirebaseFirestore.instance
+          .collection('schedules')
+          .where('date', isEqualTo: todayStr)
+          .get();
 
-      todaysSchedule =
-          scheduleQuery.docs.map((doc) {
-            final data = doc.data();
-            final timeSlot = (data['timeSlot'] ?? '').toString();
-            return {
-              'id': doc.id,
-              'roadId': (data['roadId'] ?? '').toString(),
-              'roadName': (data['roadName'] ?? 'Unknown Road').toString(),
-              'date': (data['date'] ?? todayStr).toString(),
-              'timeSlot': timeSlot,
-              'wasteType': (data['wasteType'] ?? 'General').toString(),
-              'status': (data['status'] ?? 'Scheduled').toString(),
-              'createdAt': data['createdAt'],
-              // NEW: timestamp mentions
-              'startedAt': data['startedAt'],
-              'completedAt': data['completedAt'],
-              // derived
-              'estimatedDuration': _durationFromTimeSlotMinutes(timeSlot),
-              // legacy keys kept empty
-              'binId': '',
-              'location': '',
-              'notes': '',
-            };
-          }).toList();
+      todaysSchedule = scheduleQuery.docs.map((doc) {
+        final data = doc.data();
+        final timeSlot = (data['timeSlot'] ?? '').toString();
+        return {
+          'id': doc.id,
+          'roadId': (data['roadId'] ?? '').toString(),
+          'roadName': (data['roadName'] ?? 'Unknown Road').toString(),
+          'date': (data['date'] ?? todayStr).toString(),
+          'timeSlot': timeSlot,
+          'wasteType': (data['wasteType'] ?? 'General').toString(),
+          'status': (data['status'] ?? 'Scheduled').toString(),
+          'createdAt': data['createdAt'],
+          // NEW: timestamp mentions
+          'startedAt': data['startedAt'],
+          'completedAt': data['completedAt'],
+          // derived
+          'estimatedDuration': _durationFromTimeSlotMinutes(timeSlot),
+          // legacy keys kept empty
+          'binId': '',
+          'location': '',
+          'notes': '',
+        };
+      }).toList();
 
       // Sort by start time of the slot, fallback to createdAt
       todaysSchedule.sort((a, b) {
@@ -418,14 +406,12 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
         if (aStart != null && bStart != null) {
           return aStart.compareTo(bStart);
         }
-        final aTs =
-            a['createdAt'] is Timestamp
-                ? (a['createdAt'] as Timestamp).toDate()
-                : DateTime.fromMillisecondsSinceEpoch(0);
-        final bTs =
-            b['createdAt'] is Timestamp
-                ? (b['createdAt'] as Timestamp).toDate()
-                : DateTime.fromMillisecondsSinceEpoch(0);
+        final aTs = a['createdAt'] is Timestamp
+            ? (a['createdAt'] as Timestamp).toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final bTs = b['createdAt'] is Timestamp
+            ? (b['createdAt'] as Timestamp).toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
         return aTs.compareTo(bTs);
       });
 
@@ -719,12 +705,11 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
     });
     try {
       // Update the driver's status in Firestore
-      final driverQuery =
-          await FirebaseFirestore.instance
-              .collection('drivers')
-              .where('name', isEqualTo: widget.driverName)
-              .limit(1)
-              .get();
+      final driverQuery = await FirebaseFirestore.instance
+          .collection('drivers')
+          .where('name', isEqualTo: widget.driverName)
+          .limit(1)
+          .get();
 
       if (driverQuery.docs.isNotEmpty) {
         await driverQuery.docs.first.reference.update({'status': newStatus});
@@ -888,393 +873,386 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
           ),
         ),
       ),
-      body:
-          isLoading
-              ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF42A5F5)),
-              )
-              : RefreshIndicator(
-                onRefresh: () async {
-                  await _loadDriverData();
-                  await _loadTodaysSchedule();
-                },
-                color: const Color(0xFF42A5F5),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Modern Welcome Header
-                      _buildModernWelcomeBar(),
-                      const SizedBox(height: 24),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF42A5F5)),
+            )
+          : RefreshIndicator(
+              onRefresh: () async {
+                await _loadDriverData();
+                await _loadTodaysSchedule();
+              },
+              color: const Color(0xFF42A5F5),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Modern Welcome Header
+                    _buildModernWelcomeBar(),
+                    const SizedBox(height: 24),
 
-                      // Vehicle Selection Section
-                      _buildVehicleSelectionBar(),
-                      const SizedBox(height: 24),
+                    // Vehicle Selection Section
+                    _buildVehicleSelectionBar(),
+                    const SizedBox(height: 24),
 
-                      // Today's Schedule Section
-                      _buildTodaysScheduleSection(),
-                      const SizedBox(height: 24),
+                    // Today's Schedule Section
+                    _buildTodaysScheduleSection(),
+                    const SizedBox(height: 24),
 
-                      // Stats Overview
-                      const Text(
-                        'Today\'s Overview',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color.fromARGB(221, 25, 118, 210),
-                        ),
+                    // Stats Overview
+                    const Text(
+                      'Today\'s Overview',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color.fromARGB(221, 25, 118, 210),
                       ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              title: 'Total Pickups',
-                              value: pickups.length.toString(),
-                              icon: Icons.list_alt,
-                              color: Colors.blue,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            title: 'Total Pickups',
+                            value: pickups.length.toString(),
+                            icon: Icons.list_alt,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildStatCard(
+                            title: 'Completed',
+                            value: completedPickupsToday.toString(),
+                            icon: Icons.check_circle,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStatCard(
+                            title: 'Truck Capacity',
+                            value: '$truckCapacity kg',
+                            icon: Icons.local_shipping,
+                            color: Colors.orange,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Card(
+                            elevation: 2,
+                            color: const Color(
+                              0xFFF0F8FF,
+                            ), // Very light blue background
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.circle,
+                                        color: _getStatusColor(truckStatus),
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Status',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  DropdownButton<String>(
+                                    value: truckStatus,
+                                    isExpanded: true,
+                                    items: ['Idle', 'In Route', 'Maintenance']
+                                        .map(
+                                          (status) => DropdownMenuItem(
+                                            value: status,
+                                            child: Text(status),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (val) {
+                                      if (val != null) _changeTruckStatus(val);
+                                    },
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStatCard(
-                              title: 'Completed',
-                              value: completedPickupsToday.toString(),
-                              icon: Icons.check_circle,
-                              color: Colors.green,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Notifications Section
+                    if (notifications.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          const Text(
+                            'Notifications',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
                             ),
+                          ),
+                          const SizedBox(width: 8),
+                          Badge(
+                            label: Text(notifications.length.toString()),
+                            backgroundColor: Colors.red,
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              title: 'Truck Capacity',
-                              value: '$truckCapacity kg',
-                              icon: Icons.local_shipping,
+                      ...notifications.map(
+                        (notif) => Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          elevation: 1,
+                          color: const Color(
+                            0xFFF0F8FF,
+                          ), // Very light blue background
+                          child: ListTile(
+                            leading: const Icon(
+                              Icons.notifications_active,
                               color: Colors.orange,
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Card(
-                              elevation: 2,
-                              color: const Color(
-                                0xFFF0F8FF,
-                              ), // Very light blue background
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.circle,
-                                          color: _getStatusColor(truckStatus),
-                                          size: 16,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Status',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    DropdownButton<String>(
-                                      value: truckStatus,
-                                      isExpanded: true,
-                                      items:
-                                          ['Idle', 'In Route', 'Maintenance']
-                                              .map(
-                                                (status) => DropdownMenuItem(
-                                                  value: status,
-                                                  child: Text(status),
-                                                ),
-                                              )
-                                              .toList(),
-                                      onChanged: (val) {
-                                        if (val != null)
-                                          _changeTruckStatus(val);
-                                      },
-                                    ),
-                                  ],
-                                ),
+                            title: Text(notif['title'] ?? 'Notification'),
+                            subtitle: Text(notif['message'] ?? ''),
+                            trailing: Text(
+                              notif['createdAt'] != null &&
+                                      notif['createdAt'] is Timestamp
+                                  ? _formatTime(
+                                      (notif['createdAt'] as Timestamp)
+                                          .toDate(),
+                                    )
+                                  : '',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
                               ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 24),
+                    ],
 
-                      // Notifications Section
-                      if (notifications.isNotEmpty) ...[
-                        Row(
-                          children: [
-                            const Text(
-                              'Notifications',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                    // Today's Pickups
+                    const Text(
+                      'Today\'s Pickups',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (pickups.isEmpty)
+                      Card(
+                        color: const Color(
+                          0xFFF0F8FF,
+                        ), // Very light blue background
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.emoji_transportation,
+                                size: 48,
+                                color: Colors.grey[400],
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Badge(
-                              label: Text(notifications.length.toString()),
-                              backgroundColor: Colors.red,
-                            ),
-                          ],
+                              const SizedBox(height: 12),
+                              const Text(
+                                'No pickups scheduled for today',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 12),
-                        ...notifications.map(
-                          (notif) => Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            elevation: 1,
+                      )
+                    else
+                      Column(
+                        children: pickups.map((pickup) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            elevation: 2,
                             color: const Color(
                               0xFFF0F8FF,
                             ), // Very light blue background
                             child: ListTile(
-                              leading: const Icon(
-                                Icons.notifications_active,
-                                color: Colors.orange,
+                              contentPadding: const EdgeInsets.all(16),
+                              leading: Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(
+                                    pickup['status'] ?? 'Pending',
+                                  ).withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _getStatusIcon(
+                                    pickup['status'] ?? 'Pending',
+                                  ),
+                                  color: _getStatusColor(
+                                    pickup['status'] ?? 'Pending',
+                                  ),
+                                ),
                               ),
-                              title: Text(notif['title'] ?? 'Notification'),
-                              subtitle: Text(notif['message'] ?? ''),
-                              trailing: Text(
-                                notif['createdAt'] != null &&
-                                        notif['createdAt'] is Timestamp
-                                    ? _formatTime(
-                                      (notif['createdAt'] as Timestamp)
-                                          .toDate(),
-                                    )
-                                    : '',
+                              title: Text(
+                                'Bin: ${pickup['binId'] ?? 'N/A'}',
                                 style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Location: ${pickup['location'] ?? 'Unknown'}',
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Chip(
+                                    label: Text(
+                                      pickup['status'] ?? 'Pending',
+                                      style: TextStyle(
+                                        color: _getStatusColor(
+                                          pickup['status'] ?? 'Pending',
+                                        ),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    backgroundColor: _getStatusColor(
+                                      pickup['status'] ?? 'Pending',
+                                    ).withOpacity(0.1),
+                                  ),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (pickup['status'] != 'Completed')
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                      ),
+                                      tooltip: 'Mark Complete',
+                                      onPressed: () => _updatePickupStatus(
+                                        pickup['docId'],
+                                        'Completed',
+                                      ),
+                                    ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.report_problem,
+                                      color: Colors.orange,
+                                    ),
+                                    tooltip: 'Report Issue',
+                                    onPressed: () => _reportBinIssue(
+                                      pickup['binId'] ?? '',
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 24),
+
+                    // Quick Actions
+                    const Text(
+                      'Quick Actions',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GridView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 1.5,
+                      ),
+                      children: [
+                        _buildActionCard(
+                          icon: Icons.map,
+                          title: 'Route Map',
+                          color: Colors.blue,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const RouteMapScreen(),
+                              ),
+                            );
+                          },
                         ),
-                        const SizedBox(height: 24),
+                        _buildActionCard(
+                          icon: Icons.history,
+                          title: 'History',
+                          color: Colors.purple,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const DriverHistoryPage(),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildActionCard(
+                          icon: Icons.report,
+                          title: 'Reports',
+                          color: Colors.orange,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const DriverReportsPage(),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildActionCard(
+                          icon: Icons.settings,
+                          title: 'Settings',
+                          color: Colors.grey,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const DriverSettingsPage(),
+                              ),
+                            );
+                          },
+                        ),
                       ],
-
-                      // Today's Pickups
-                      const Text(
-                        'Today\'s Pickups',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (pickups.isEmpty)
-                        Card(
-                          color: const Color(
-                            0xFFF0F8FF,
-                          ), // Very light blue background
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.emoji_transportation,
-                                  size: 48,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'No pickups scheduled for today',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      else
-                        Column(
-                          children:
-                              pickups.map((pickup) {
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  elevation: 2,
-                                  color: const Color(
-                                    0xFFF0F8FF,
-                                  ), // Very light blue background
-                                  child: ListTile(
-                                    contentPadding: const EdgeInsets.all(16),
-                                    leading: Container(
-                                      width: 50,
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        color: _getStatusColor(
-                                          pickup['status'] ?? 'Pending',
-                                        ).withOpacity(0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        _getStatusIcon(
-                                          pickup['status'] ?? 'Pending',
-                                        ),
-                                        color: _getStatusColor(
-                                          pickup['status'] ?? 'Pending',
-                                        ),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      'Bin: ${pickup['binId'] ?? 'N/A'}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Location: ${pickup['location'] ?? 'Unknown'}',
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Chip(
-                                          label: Text(
-                                            pickup['status'] ?? 'Pending',
-                                            style: TextStyle(
-                                              color: _getStatusColor(
-                                                pickup['status'] ?? 'Pending',
-                                              ),
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          backgroundColor: _getStatusColor(
-                                            pickup['status'] ?? 'Pending',
-                                          ).withOpacity(0.1),
-                                        ),
-                                      ],
-                                    ),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (pickup['status'] != 'Completed')
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.check_circle,
-                                              color: Colors.green,
-                                            ),
-                                            tooltip: 'Mark Complete',
-                                            onPressed:
-                                                () => _updatePickupStatus(
-                                                  pickup['docId'],
-                                                  'Completed',
-                                                ),
-                                          ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.report_problem,
-                                            color: Colors.orange,
-                                          ),
-                                          tooltip: 'Report Issue',
-                                          onPressed:
-                                              () => _reportBinIssue(
-                                                pickup['binId'] ?? '',
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                        ),
-                      const SizedBox(height: 24),
-
-                      // Quick Actions
-                      const Text(
-                        'Quick Actions',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      GridView(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                              childAspectRatio: 1.5,
-                            ),
-                        children: [
-                          _buildActionCard(
-                            icon: Icons.map,
-                            title: 'Route Map',
-                            color: Colors.blue,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const RouteMapScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          _buildActionCard(
-                            icon: Icons.history,
-                            title: 'History',
-                            color: Colors.purple,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DriverHistoryPage(),
-                                ),
-                              );
-                            },
-                          ),
-                          _buildActionCard(
-                            icon: Icons.report,
-                            title: 'Reports',
-                            color: Colors.orange,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DriverReportsPage(),
-                                ),
-                              );
-                            },
-                          ),
-                          _buildActionCard(
-                            icon: Icons.settings,
-                            title: 'Settings',
-                            color: Colors.grey,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DriverSettingsPage(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
     );
   }
 
@@ -1289,222 +1267,220 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder:
-          (context) => Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFE3F2FD), Colors.white],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header with app branding
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF42A5F5), Color(0xFF1E88E5)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(20),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 25,
-                          backgroundColor: const Color.fromARGB(
-                            255,
-                            227,
-                            244,
-                            255,
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              const Icon(
-                                Icons.eco,
-                                color: Color(0xFF1976D2),
-                                size: 40,
-                              ),
-                              Positioned(
-                                bottom: -1,
-                                right: 1,
-                                child: Icon(
-                                  Icons.local_shipping,
-                                  color: const Color.fromARGB(
-                                    255,
-                                    73,
-                                    197,
-                                    254,
-                                  ),
-                                  size: 20,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'Clea~Ro Go',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const Text(
-                                'Menu Bar',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
-                    ),
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFE3F2FD), Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with app branding
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF42A5F5), Color(0xFF1E88E5)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-
-                  // Scrollable menu items
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 25,
+                      backgroundColor: const Color.fromARGB(
+                        255,
+                        227,
+                        244,
+                        255,
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
                         children: [
-                          _buildMenuListTile(
-                            Icons.dashboard,
-                            'Dashboard',
-                            Colors.blue,
-                            () => Navigator.pop(context),
+                          const Icon(
+                            Icons.eco,
+                            color: Color(0xFF1976D2),
+                            size: 40,
                           ),
-                          _buildMenuListTile(
-                            Icons.person_outline,
-                            'My Profile',
-                            Colors.green,
-                            () {
-                              Navigator.pop(context);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => DriverProfilePage(
-                                        driverName: widget.driverName,
-                                      ),
-                                ),
-                              );
-                            },
+                          Positioned(
+                            bottom: -1,
+                            right: 1,
+                            child: Icon(
+                              Icons.local_shipping,
+                              color: const Color.fromARGB(
+                                255,
+                                73,
+                                197,
+                                254,
+                              ),
+                              size: 20,
+                            ),
                           ),
-                          _buildMenuListTile(
-                            Icons.history,
-                            'Pickup History',
-                            Colors.purple,
-                            () {
-                              Navigator.pop(context);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DriverHistoryPage(),
-                                ),
-                              );
-                            },
-                          ),
-                          _buildMenuListTile(
-                            Icons.assessment,
-                            'Performance Reports',
-                            Colors.orange,
-                            () {
-                              Navigator.pop(context);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DriverReportsPage(),
-                                ),
-                              );
-                            },
-                          ),
-                          _buildMenuListTile(
-                            Icons.route,
-                            'Route Navigation',
-                            Colors.indigo,
-                            () {
-                              Navigator.pop(context);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const RouteMapScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          _buildMenuListTile(
-                            Icons.settings,
-                            'Settings',
-                            Colors.grey,
-                            () {
-                              Navigator.pop(context);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DriverSettingsPage(),
-                                ),
-                              );
-                            },
-                          ),
-                          _buildMenuListTile(
-                            Icons.support_agent,
-                            'Help & Support',
-                            Colors.teal,
-                            () {
-                              Navigator.pop(context);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DriverHelpSupportPage(),
-                                ),
-                              );
-                            },
-                          ),
-                          const Divider(
-                            color: Colors.grey,
-                            thickness: 1,
-                            height: 20,
-                          ),
-                          _buildMenuListTile(
-                            Icons.logout,
-                            'Logout',
-                            Colors.red,
-                            () {
-                              Navigator.pop(context);
-                              _logout();
-                            },
-                          ),
-                          const SizedBox(height: 16),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Clea~Ro Go',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const Text(
+                            'Menu Bar',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
               ),
-            ),
+
+              // Scrollable menu items
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildMenuListTile(
+                        Icons.dashboard,
+                        'Dashboard',
+                        Colors.blue,
+                        () => Navigator.pop(context),
+                      ),
+                      _buildMenuListTile(
+                        Icons.person_outline,
+                        'My Profile',
+                        Colors.green,
+                        () {
+                          Navigator.pop(context);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DriverProfilePage(
+                                driverName: widget.driverName,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuListTile(
+                        Icons.history,
+                        'Pickup History',
+                        Colors.purple,
+                        () {
+                          Navigator.pop(context);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DriverHistoryPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuListTile(
+                        Icons.assessment,
+                        'Performance Reports',
+                        Colors.orange,
+                        () {
+                          Navigator.pop(context);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DriverReportsPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuListTile(
+                        Icons.route,
+                        'Route Navigation',
+                        Colors.indigo,
+                        () {
+                          Navigator.pop(context);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const RouteMapScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuListTile(
+                        Icons.settings,
+                        'Settings',
+                        Colors.grey,
+                        () {
+                          Navigator.pop(context);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DriverSettingsPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuListTile(
+                        Icons.support_agent,
+                        'Help & Support',
+                        Colors.teal,
+                        () {
+                          Navigator.pop(context);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const DriverHelpSupportPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      const Divider(
+                        color: Colors.grey,
+                        thickness: 1,
+                        height: 20,
+                      ),
+                      _buildMenuListTile(
+                        Icons.logout,
+                        'Logout',
+                        Colors.red,
+                        () {
+                          Navigator.pop(context);
+                          _logout();
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -1539,72 +1515,70 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
   void _showSettingsDialog() {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.settings, color: Color(0xFF42A5F5)),
+            SizedBox(width: 8),
+            Text('Settings'),
+          ],
+        ),
+        content: const Text(
+          'Driver settings allow you to customize your experience, manage notifications, and update your preferences.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Close',
+              style: TextStyle(color: Color(0xFF42A5F5)),
             ),
-            title: const Row(
-              children: [
-                Icon(Icons.settings, color: Color(0xFF42A5F5)),
-                SizedBox(width: 8),
-                Text('Settings'),
-              ],
-            ),
-            content: const Text(
-              'Driver settings allow you to customize your experience, manage notifications, and update your preferences.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text(
-                  'Close',
-                  style: TextStyle(color: Color(0xFF42A5F5)),
-                ),
-              ),
-            ],
           ),
+        ],
+      ),
     );
   }
 
   void _showSupportDialog() {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.support_agent, color: Color(0xFF42A5F5)),
+            SizedBox(width: 8),
+            Text('Support Contact'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('📞 Emergency: +94-112-911-119'),
+            SizedBox(height: 8),
+            Text('📧 Email: driver-support@clearo.lk'),
+            SizedBox(height: 8),
+            Text('💬 WhatsApp: +94-77-123-4567'),
+            SizedBox(height: 8),
+            Text('🕒 Available 24/7'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Close',
+              style: TextStyle(color: Color(0xFF42A5F5)),
             ),
-            title: const Row(
-              children: [
-                Icon(Icons.support_agent, color: Color(0xFF42A5F5)),
-                SizedBox(width: 8),
-                Text('Support Contact'),
-              ],
-            ),
-            content: const Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('📞 Emergency: +94-112-911-119'),
-                SizedBox(height: 8),
-                Text('📧 Email: driver-support@clearo.lk'),
-                SizedBox(height: 8),
-                Text('💬 WhatsApp: +94-77-123-4567'),
-                SizedBox(height: 8),
-                Text('🕒 Available 24/7'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text(
-                  'Close',
-                  style: TextStyle(color: Color(0xFF42A5F5)),
-                ),
-              ),
-            ],
           ),
+        ],
+      ),
     );
   }
 
@@ -1839,7 +1813,6 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
             ],
           ),
           const SizedBox(height: 16),
-
           if (selectedVehicleData != null) ...[
             // Display selected vehicle info with enhanced design
             Container(
@@ -1881,11 +1854,11 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                                   true
                               ? Icons.local_shipping
                               : selectedVehicleData!['vehicleType']
-                                      ?.toLowerCase()
-                                      .contains('compact') ==
-                                  true
-                              ? Icons.fire_truck
-                              : Icons.agriculture,
+                                          ?.toLowerCase()
+                                          .contains('compact') ==
+                                      true
+                                  ? Icons.fire_truck
+                                  : Icons.agriculture,
                           color: const Color(0xFF1976D2),
                           size: 28,
                         ),
@@ -2028,7 +2001,6 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   if (isLoadingVehicles)
                     const Center(
                       child: Padding(
@@ -2085,88 +2057,82 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                             style: TextStyle(color: Colors.grey),
                           ),
                           isExpanded: true,
-                          items:
-                              availableVehicles
-                                  .where(
-                                    (vehicle) =>
-                                        vehicle['status'] == 'Available' ||
-                                        vehicle['currentDriver'] ==
-                                            widget.driverName,
-                                  )
-                                  .map(
-                                    (vehicle) => DropdownMenuItem<String>(
-                                      value: vehicle['id'],
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            vehicle['vehicleType']
-                                                        ?.toLowerCase()
-                                                        .contains('dump') ==
-                                                    true
-                                                ? Icons.local_shipping
-                                                : vehicle['vehicleType']
+                          items: availableVehicles
+                              .where(
+                                (vehicle) =>
+                                    vehicle['status'] == 'Available' ||
+                                    vehicle['currentDriver'] ==
+                                        widget.driverName,
+                              )
+                              .map(
+                                (vehicle) => DropdownMenuItem<String>(
+                                  value: vehicle['id'],
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        vehicle['vehicleType']
+                                                    ?.toLowerCase()
+                                                    .contains('dump') ==
+                                                true
+                                            ? Icons.local_shipping
+                                            : vehicle['vehicleType']
                                                         ?.toLowerCase()
                                                         .contains('compact') ==
                                                     true
                                                 ? Icons.fire_truck
                                                 : Icons.agriculture,
-                                            size: 20,
+                                        size: 20,
+                                        color: vehicle['status'] == 'Available'
+                                            ? Colors.green
+                                            : Colors.blue,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          vehicle['vehicleNumber'],
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            color:
+                                                vehicle['status'] == 'Available'
+                                                    ? Colors.black87
+                                                    : Colors.blue,
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: vehicle['status'] ==
+                                                  'Available'
+                                              ? Colors.green.withOpacity(0.1)
+                                              : Colors.blue.withOpacity(
+                                                  0.1,
+                                                ),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          vehicle['status'] == 'Available'
+                                              ? 'Available'
+                                              : 'Mine',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
                                             color:
                                                 vehicle['status'] == 'Available'
                                                     ? Colors.green
                                                     : Colors.blue,
                                           ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              vehicle['vehicleNumber'],
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                color:
-                                                    vehicle['status'] ==
-                                                            'Available'
-                                                        ? Colors.black87
-                                                        : Colors.blue,
-                                              ),
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color:
-                                                  vehicle['status'] ==
-                                                          'Available'
-                                                      ? Colors.green
-                                                          .withOpacity(0.1)
-                                                      : Colors.blue.withOpacity(
-                                                        0.1,
-                                                      ),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              vehicle['status'] == 'Available'
-                                                  ? 'Available'
-                                                  : 'Mine',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                                color:
-                                                    vehicle['status'] ==
-                                                            'Available'
-                                                        ? Colors.green
-                                                        : Colors.blue,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                                        ),
                                       ),
-                                    ),
-                                  )
-                                  .toList(),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
                           onChanged: (String? vehicleId) {
                             if (vehicleId != null) {
                               _assignVehicleToDriver(vehicleId);
@@ -2215,12 +2181,10 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
   }
 
   Widget _buildVehicleSelectionCard(Map<String, dynamic> vehicle) {
-    final isAssignedToOther =
-        vehicle['status'] == 'Assigned' &&
+    final isAssignedToOther = vehicle['status'] == 'Assigned' &&
         vehicle['currentDriver'] != widget.driverName;
     final isAvailable = vehicle['status'] == 'Available';
-    final isAssignedToMe =
-        vehicle['status'] == 'Assigned' &&
+    final isAssignedToMe = vehicle['status'] == 'Assigned' &&
         vehicle['currentDriver'] == widget.driverName;
 
     Color statusColor;
@@ -2253,32 +2217,29 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
       elevation: isAvailable || isAssignedToMe ? 3 : 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        onTap:
-            (isAvailable || isAssignedToMe)
-                ? () => _assignVehicleToDriver(vehicle['id'])
-                : () => _showVehicleDetailsDialog(vehicle),
+        onTap: (isAvailable || isAssignedToMe)
+            ? () => _assignVehicleToDriver(vehicle['id'])
+            : () => _showVehicleDetailsDialog(vehicle),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(
-              colors:
-                  isAvailable
-                      ? [Colors.green.shade50, Colors.white]
-                      : isAssignedToMe
+              colors: isAvailable
+                  ? [Colors.green.shade50, Colors.white]
+                  : isAssignedToMe
                       ? [Colors.blue.shade50, Colors.white]
                       : isAssignedToOther
-                      ? [Colors.orange.shade50, Colors.grey.shade100]
-                      : [Colors.grey.shade100, Colors.grey.shade50],
+                          ? [Colors.orange.shade50, Colors.grey.shade100]
+                          : [Colors.grey.shade100, Colors.grey.shade50],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             border: Border.all(
-              color:
-                  isAvailable
-                      ? Colors.green.withOpacity(0.3)
-                      : isAssignedToMe
+              color: isAvailable
+                  ? Colors.green.withOpacity(0.3)
+                  : isAssignedToMe
                       ? Colors.blue.withOpacity(0.3)
                       : Colors.grey.withOpacity(0.3),
               width: isAvailable || isAssignedToMe ? 2 : 1,
@@ -2304,16 +2265,16 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                               true
                           ? Icons.local_shipping
                           : vehicle['vehicleType']?.toLowerCase().contains(
-                                'compact',
-                              ) ==
-                              true
-                          ? Icons.fire_truck
-                          : vehicle['vehicleType']?.toLowerCase().contains(
-                                'mini',
-                              ) ==
-                              true
-                          ? Icons.airport_shuttle
-                          : Icons.local_shipping,
+                                        'compact',
+                                      ) ==
+                                  true
+                              ? Icons.fire_truck
+                              : vehicle['vehicleType']?.toLowerCase().contains(
+                                            'mini',
+                                          ) ==
+                                      true
+                                  ? Icons.airport_shuttle
+                                  : Icons.local_shipping,
                       size: 28,
                       color: statusColor,
                     ),
@@ -2330,10 +2291,9 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color:
-                                    isAssignedToOther
-                                        ? Colors.grey.shade600
-                                        : const Color(0xFF0D47A1),
+                                color: isAssignedToOther
+                                    ? Colors.grey.shade600
+                                    : const Color(0xFF0D47A1),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -2376,10 +2336,9 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                           '${vehicle['vehicleType']} • ${vehicle['model']} (${vehicle['year']})',
                           style: TextStyle(
                             fontSize: 13,
-                            color:
-                                isAssignedToOther
-                                    ? Colors.grey
-                                    : const Color(0xFF1976D2),
+                            color: isAssignedToOther
+                                ? Colors.grey
+                                : const Color(0xFF1976D2),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -2532,182 +2491,179 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
   void _showVehicleDetailsDialog(Map<String, dynamic> vehicle) {
     showDialog(
       context: context,
-      builder:
-          (context) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400, maxHeight: 600),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.blue.shade600, Colors.blue.shade700],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          vehicle['vehicleType']?.toLowerCase().contains(
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400, maxHeight: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade600, Colors.blue.shade700],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      vehicle['vehicleType']?.toLowerCase().contains(
                                     'dump',
                                   ) ==
-                                  true
-                              ? Icons.local_shipping
-                              : Icons.fire_truck,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                vehicle['vehicleNumber'],
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                vehicle['vehicleType'],
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close, color: Colors.white),
-                        ),
-                      ],
+                              true
+                          ? Icons.local_shipping
+                          : Icons.fire_truck,
+                      color: Colors.white,
+                      size: 32,
                     ),
-                  ),
-
-                  // Content
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
+                    const SizedBox(width: 12),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDetailRow(
-                            'License Plate',
-                            vehicle['licensePlate'],
-                          ),
-                          _buildDetailRow(
-                            'Model',
-                            '${vehicle['model']} (${vehicle['year']})',
-                          ),
-                          _buildDetailRow('Engine Type', vehicle['engineType']),
-                          _buildDetailRow(
-                            'Capacity',
-                            '${vehicle['capacity']} kg',
-                          ),
-                          _buildDetailRow(
-                            'Fuel Capacity',
-                            vehicle['fuelCapacity'],
-                          ),
-                          _buildDetailRow(
-                            'Fuel Efficiency',
-                            vehicle['fuelEfficiency'] != 'N/A'
-                                ? '${vehicle['fuelEfficiency']} km/l'
-                                : 'N/A',
-                          ),
-                          _buildDetailRow(
-                            'Max Speed',
-                            vehicle['maxSpeed'] != 'N/A'
-                                ? '${vehicle['maxSpeed']} km/h'
-                                : 'N/A',
-                          ),
-                          _buildDetailRow(
-                            'Mileage',
-                            vehicle['mileage'] != 'N/A'
-                                ? '${vehicle['mileage']} km'
-                                : 'N/A',
-                          ),
-                          _buildDetailRow('Status', vehicle['status']),
-                          if (vehicle['currentDriver'] != '')
-                            _buildDetailRow(
-                              'Current Driver',
-                              vehicle['currentDriver'],
+                          Text(
+                            vehicle['vehicleNumber'],
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                             ),
-                          _buildDetailRow(
-                            'Last Maintenance',
-                            vehicle['lastMaintenance'],
                           ),
-
-                          const SizedBox(height: 16),
-
-                          if (vehicle['status'] == 'Available') ...[
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  _assignVehicleToDriver(vehicle['id']);
-                                },
-                                icon: const Icon(Icons.assignment_turned_in),
-                                label: const Text('Assign to Me'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
+                          Text(
+                            vehicle['vehicleType'],
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
                             ),
-                          ] else ...[
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.orange.shade200,
-                                ),
-                              ),
-                              child: Text(
-                                vehicle['status'] == 'Assigned'
-                                    ? 'This vehicle is currently assigned to another driver'
-                                    : 'This vehicle is not available for assignment',
-                                style: TextStyle(
-                                  color: Colors.orange.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
               ),
-            ),
+
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailRow(
+                        'License Plate',
+                        vehicle['licensePlate'],
+                      ),
+                      _buildDetailRow(
+                        'Model',
+                        '${vehicle['model']} (${vehicle['year']})',
+                      ),
+                      _buildDetailRow('Engine Type', vehicle['engineType']),
+                      _buildDetailRow(
+                        'Capacity',
+                        '${vehicle['capacity']} kg',
+                      ),
+                      _buildDetailRow(
+                        'Fuel Capacity',
+                        vehicle['fuelCapacity'],
+                      ),
+                      _buildDetailRow(
+                        'Fuel Efficiency',
+                        vehicle['fuelEfficiency'] != 'N/A'
+                            ? '${vehicle['fuelEfficiency']} km/l'
+                            : 'N/A',
+                      ),
+                      _buildDetailRow(
+                        'Max Speed',
+                        vehicle['maxSpeed'] != 'N/A'
+                            ? '${vehicle['maxSpeed']} km/h'
+                            : 'N/A',
+                      ),
+                      _buildDetailRow(
+                        'Mileage',
+                        vehicle['mileage'] != 'N/A'
+                            ? '${vehicle['mileage']} km'
+                            : 'N/A',
+                      ),
+                      _buildDetailRow('Status', vehicle['status']),
+                      if (vehicle['currentDriver'] != '')
+                        _buildDetailRow(
+                          'Current Driver',
+                          vehicle['currentDriver'],
+                        ),
+                      _buildDetailRow(
+                        'Last Maintenance',
+                        vehicle['lastMaintenance'],
+                      ),
+                      const SizedBox(height: 16),
+                      if (vehicle['status'] == 'Available') ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _assignVehicleToDriver(vehicle['id']);
+                            },
+                            icon: const Icon(Icons.assignment_turned_in),
+                            label: const Text('Assign to Me'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.orange.shade200,
+                            ),
+                          ),
+                          child: Text(
+                            vehicle['status'] == 'Assigned'
+                                ? 'This vehicle is currently assigned to another driver'
+                                : 'This vehicle is not available for assignment',
+                            style: TextStyle(
+                              color: Colors.orange.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -2806,7 +2762,6 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
             ],
           ),
           const SizedBox(height: 16),
-
           if (isLoadingSchedule)
             const Center(
               child: Padding(
@@ -2835,10 +2790,9 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
             )
           else
             Column(
-              children:
-                  todaysSchedule
-                      .map((schedule) => _buildScheduleItem(schedule))
-                      .toList(),
+              children: todaysSchedule
+                  .map((schedule) => _buildScheduleItem(schedule))
+                  .toList(),
             ),
         ],
       ),
@@ -2919,30 +2873,29 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
   void _reportBinIssue(String binId) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Report Bin Issue'),
-            content: Text('Report an issue for Bin: $binId'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  // Here you can add logic to send the report to Firestore or your backend
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Issue reported!'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                },
-                child: const Text('Report'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Report Bin Issue'),
+        content: Text('Report an issue for Bin: $binId'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () {
+              // Here you can add logic to send the report to Firestore or your backend
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Issue reported!'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            },
+            child: const Text('Report'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2950,34 +2903,33 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
   void _onTimeSlotTap(Map<String, dynamic> schedule) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('Schedule Details'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Road: ${schedule['roadName']}'),
-                Text('Time: ${schedule['timeSlot']}'),
-                Text('Waste Type: ${schedule['wasteType']}'),
-                Text('Status: ${schedule['status']}'),
-                if (schedule['startedAt'] != null)
-                  Text(
-                    'Started: ${_formatTime((schedule['startedAt'] as Timestamp).toDate())}',
-                  ),
-                if (schedule['completedAt'] != null)
-                  Text(
-                    'Completed: ${_formatTime((schedule['completedAt'] as Timestamp).toDate())}',
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Close'),
+      builder: (context) => AlertDialog(
+        title: Text('Schedule Details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Road: ${schedule['roadName']}'),
+            Text('Time: ${schedule['timeSlot']}'),
+            Text('Waste Type: ${schedule['wasteType']}'),
+            Text('Status: ${schedule['status']}'),
+            if (schedule['startedAt'] != null)
+              Text(
+                'Started: ${_formatTime((schedule['startedAt'] as Timestamp).toDate())}',
               ),
-            ],
+            if (schedule['completedAt'] != null)
+              Text(
+                'Completed: ${_formatTime((schedule['completedAt'] as Timestamp).toDate())}',
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
           ),
+        ],
+      ),
     );
   }
 
@@ -3003,19 +2955,17 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
       margin: const EdgeInsets.only(bottom: 12),
       child: Card(
         elevation: isInProgress ? 4 : 2,
-        color:
-            isCompleted
-                ? Colors.green.shade50
-                : isInProgress
+        color: isCompleted
+            ? Colors.green.shade50
+            : isInProgress
                 ? Colors.blue.shade50
                 : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color:
-                isInProgress
-                    ? Colors.blue.withOpacity(0.5)
-                    : Colors.grey.withOpacity(0.2),
+            color: isInProgress
+                ? Colors.blue.withOpacity(0.5)
+                : Colors.grey.withOpacity(0.2),
             width: isInProgress ? 2 : 1,
           ),
         ),
@@ -3039,16 +2989,14 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color:
-                              isTimePassed
-                                  ? Colors.grey.shade100
-                                  : Colors.blue.shade100,
+                          color: isTimePassed
+                              ? Colors.grey.shade100
+                              : Colors.blue.shade100,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color:
-                                isTimePassed
-                                    ? Colors.grey.shade300
-                                    : Colors.blue.shade300,
+                            color: isTimePassed
+                                ? Colors.grey.shade300
+                                : Colors.blue.shade300,
                           ),
                         ),
                         child: Text(
@@ -3056,10 +3004,9 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color:
-                                isTimePassed
-                                    ? Colors.grey.shade600
-                                    : Colors.blue.shade700,
+                            color: isTimePassed
+                                ? Colors.grey.shade600
+                                : Colors.blue.shade700,
                           ),
                         ),
                       ),
@@ -3244,21 +3191,19 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                   children: [
                     if ((schedule['status'] ?? '') != 'Completed') ...[
                       IconButton(
-                        onPressed:
-                            () => _updateScheduleStatus(
-                              schedule['id'],
-                              (schedule['status'] == 'In Progress')
-                                  ? 'Completed'
-                                  : 'In Progress',
-                            ),
+                        onPressed: () => _updateScheduleStatus(
+                          schedule['id'],
+                          (schedule['status'] == 'In Progress')
+                              ? 'Completed'
+                              : 'In Progress',
+                        ),
                         icon: Icon(
                           (schedule['status'] == 'In Progress')
                               ? Icons.check_circle
                               : Icons.play_circle,
-                          color:
-                              (schedule['status'] == 'In Progress')
-                                  ? Colors.green
-                                  : Colors.blue,
+                          color: (schedule['status'] == 'In Progress')
+                              ? Colors.green
+                              : Colors.blue,
                           size: 22,
                         ),
                         padding: EdgeInsets.zero,
@@ -3266,10 +3211,9 @@ class _DriverDashboardPageState extends State<DriverDashboardPage> {
                           width: 40,
                           height: 40,
                         ),
-                        tooltip:
-                            (schedule['status'] == 'In Progress')
-                                ? 'Mark Complete'
-                                : 'Start Slot',
+                        tooltip: (schedule['status'] == 'In Progress')
+                            ? 'Mark Complete'
+                            : 'Start Slot',
                       ),
                     ] else
                       const Icon(

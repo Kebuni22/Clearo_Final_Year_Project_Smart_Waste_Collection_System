@@ -7,15 +7,25 @@ import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('Firebase initialized successfully');
+    debugPrint('✅ Firebase initialized successfully');
   } catch (e) {
-    debugPrint('Failed to initialize Firebase: $e');
-    // Continue anyway as this may be a development environment issue
+    debugPrint('❌ Failed to initialize Firebase: $e');
+    // Show error but continue - app will show error screen if Firebase is needed
   }
+
+  try {
+    await NotificationService().initialize();
+    debugPrint('✅ Notifications initialized successfully');
+  } catch (e) {
+    debugPrint('⚠️ Failed to initialize notifications: $e');
+    // Continue without notifications
+  }
+
   runApp(const MyApp());
 }
 
@@ -30,15 +40,18 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Start bin monitoring when app starts
     _initializeNotifications();
   }
 
   void _initializeNotifications() {
-    // Check bin status every 5 minutes
-    Stream.periodic(Duration(minutes: 5)).listen((_) {
-      NotificationService.checkSmartBinStatus();
-    });
+    try {
+      // Check bin status every 5 minutes
+      Stream.periodic(const Duration(minutes: 5)).listen((_) {
+        NotificationService.checkSmartBinStatus();
+      });
+    } catch (e) {
+      debugPrint('⚠️ Error setting up periodic bin checks: $e');
+    }
   }
 
   @override
@@ -48,7 +61,6 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(
         primarySwatch: Colors.green,
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        // Add additional theme settings for better button handling
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,

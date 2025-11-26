@@ -1,13 +1,14 @@
 buildscript {
-    ext.kotlin_version = '1.9.22' // Match Flutter's current version
+    ext.kotlin_version = '1.9.10'  // Update Kotlin version
     repositories {
         google()
         mavenCentral()
     }
+
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.2.0'
+        classpath 'com.android.tools.build:gradle:8.1.0'  // Update if needed
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'com.google.gms:google-services:4.4.1' // For Firebase
+        classpath 'com.google.gms:google-services:4.4.0'  // Update Google Services
     }
 }
 

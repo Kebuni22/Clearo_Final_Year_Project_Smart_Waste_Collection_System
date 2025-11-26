@@ -12,6 +12,9 @@ import 'screens/notification_screen.dart'; // Import the notification screen
 import 'screens/user_account_screen.dart'; // Import the UserAccountScreen
 import 'screens/truck_tracking_screen.dart'; // Import TruckTrackingScreen
 import 'screens/health_alerts_screen.dart'; // Import HealthAlertsScreen
+import 'screens/help_support_screen.dart'; // Add this import
+import 'screens/about_screen.dart'; // Add this import
+import 'screens/settings_screen.dart'; // Add this import
 
 class DashboardPage extends StatefulWidget {
   final String userName;
@@ -100,74 +103,73 @@ class _DashboardPageState extends State<DashboardPage> {
   void _signOut() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            backgroundColor: const Color(
-              0xFFEFFAF1,
-            ), // Very light green background
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(
+          0xFFEFFAF1,
+        ), // Very light green background
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.logout, color: Colors.red),
+            const SizedBox(width: 8),
+            const Text(
+              'Confirm Logout',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            title: Row(
-              children: [
-                const Icon(Icons.logout, color: Colors.red),
-                const SizedBox(width: 8),
-                const Text(
-                  'Confirm Logout',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to log out?',
+          style: TextStyle(fontSize: 16, color: Colors.black87),
+        ),
+        actions: [
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceEvenly, // Align buttons evenly
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.black54,
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-              ],
-            ),
-            content: const Text(
-              'Are you sure you want to log out?',
-              style: TextStyle(fontSize: 16, color: Colors.black87),
-            ),
-            actions: [
-              Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceEvenly, // Align buttons evenly
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.black54,
-                      textStyle: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Cancel'),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
                   ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      textStyle: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Logout'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                ],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('Logout'),
               ),
             ],
           ),
+        ],
+      ),
     );
 
     if (shouldLogout == true) {
@@ -376,8 +378,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder:
-                              (context) => const CollectionScheduleScreen(),
+                          builder: (context) =>
+                              const CollectionScheduleScreen(),
                         ),
                       );
                     },
@@ -401,9 +403,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder:
-                              (context) =>
-                                  const ImmediatePickupScreen(), // Navigate to ImmediatePickupScreen
+                          builder: (context) =>
+                              const ImmediatePickupScreen(), // Navigate to ImmediatePickupScreen
                         ),
                       );
                     },
@@ -451,9 +452,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder:
-                              (context) =>
-                                  const TruckTrackingScreen(), // Navigate to TruckTrackingScreen
+                          builder: (context) =>
+                              const TruckTrackingScreen(), // Navigate to TruckTrackingScreen
                         ),
                       );
                     },
@@ -465,9 +465,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder:
-                              (context) =>
-                                  const HealthAlertsScreen(), // Updated screen name
+                          builder: (context) =>
+                              const HealthAlertsScreen(), // Updated screen name
                         ),
                       );
                     },
@@ -496,110 +495,76 @@ class _DashboardPageState extends State<DashboardPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder:
-          (context) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const ListTile(
-                title: Text(
-                  'Menu',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.person, color: Colors.blue),
-                title: const Text('My Account'),
-                onTap: () {
-                  Navigator.pop(context); // Close the menu
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const UserAccountScreen(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings, color: Colors.blue),
-                title: const Text('Settings'),
-                onTap: () {
-                  Navigator.pop(context); // Close the menu
-                  showDialog(
-                    context: context,
-                    builder:
-                        (context) => AlertDialog(
-                          title: const Text('Settings'),
-                          content: const Text(
-                            'Settings allow you to customize your app experience, such as notifications, themes, and more.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.help_outline, color: Colors.orange),
-                title: const Text('Help & Support'),
-                onTap: () {
-                  Navigator.pop(context); // Close the menu
-                  showDialog(
-                    context: context,
-                    builder:
-                        (context) => AlertDialog(
-                          title: const Text('Help & Support'),
-                          content: const Text(
-                            'Need assistance? Contact our support team or visit our FAQ section for common questions.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.info_outline, color: Colors.green),
-                title: const Text('About'),
-                onTap: () {
-                  Navigator.pop(context); // Close the menu
-                  showDialog(
-                    context: context,
-                    builder:
-                        (context) => AlertDialog(
-                          title: const Text('About'),
-                          content: const Text(
-                            'Clearo is a smart garbage management system designed to make waste collection efficient and eco-friendly.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Logout'),
-                onTap: () {
-                  Navigator.pop(context); // Close the menu
-                  _signOut(); // Trigger logout
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(
+            title: Text(
+              'Menu',
+              style: TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.person, color: Colors.blue),
+            title: const Text('My Account'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const UserAccountScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings, color: Colors.blue),
+            title: const Text('Settings'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.help_outline, color: Colors.orange),
+            title: const Text('Help & Support'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const HelpSupportScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.info_outline, color: Colors.green),
+            title: const Text('About'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AboutScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Logout'),
+            onTap: () {
+              Navigator.pop(context);
+              _signOut();
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 
@@ -785,17 +750,16 @@ class _DashboardPageState extends State<DashboardPage> {
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Error'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
           ),
+        ],
+      ),
     );
   }
 
@@ -868,39 +832,36 @@ class _DashboardPageState extends State<DashboardPage> {
           subtitle: 'Today, 09:30 AM',
           icon: Icons.delete_outline,
           color: Colors.blue,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CollectionScheduleScreen(),
-                ),
-              ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CollectionScheduleScreen(),
+            ),
+          ),
         ),
         _buildActivityItem(
           title: 'Recycling Completed',
           subtitle: 'Yesterday, 02:15 PM',
           icon: Icons.recycling,
           color: Colors.green,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RecyclingInfoScreen(),
-                ),
-              ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const RecyclingInfoScreen(),
+            ),
+          ),
         ),
         _buildActivityItem(
           title: 'Bin 2 Almost Full',
           subtitle: '2 days ago, 11:20 AM',
           icon: Icons.warning_amber_rounded,
           color: Colors.orange,
-          onTap:
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BinStatusScreen(),
-                ),
-              ),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const BinStatusScreen(),
+            ),
+          ),
         ),
       ],
     );
@@ -972,146 +933,144 @@ class _DashboardPageState extends State<DashboardPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder:
-          (context) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const ListTile(
-                title: Text(
-                  'Quick Actions',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.calendar_today, color: Colors.blue),
-                title: const Text('Schedule Collection'),
-                onTap: () {
-                  Navigator.pop(context); // Close the bottom sheet
-                  debugPrint(
-                    'Navigating to Collection Schedule from quick action',
-                  );
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const CollectionScheduleScreen(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.add_circle_outline,
-                  color: Colors.orange,
-                ),
-                title: const Text('Add New Bin'),
-                onTap: () {
-                  Navigator.pop(context); // Close the bottom sheet
-                  debugPrint('Navigating to Bin Status from quick action');
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const BinStatusScreen(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.report_problem_outlined,
-                  color: Colors.red,
-                ),
-                title: const Text('Report Issue'),
-                onTap: () {
-                  Navigator.pop(context); // Close the bottom sheet
-                  debugPrint('Navigating to Report Issue from quick action');
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ReportIssueScreen(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Logout'),
-                onTap: () {
-                  Navigator.pop(context); // Close the bottom sheet
-                  _signOut(); // Trigger logout
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(
+            title: Text(
+              'Quick Actions',
+              style: TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.calendar_today, color: Colors.blue),
+            title: const Text('Schedule Collection'),
+            onTap: () {
+              Navigator.pop(context); // Close the bottom sheet
+              debugPrint(
+                'Navigating to Collection Schedule from quick action',
+              );
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const CollectionScheduleScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.add_circle_outline,
+              color: Colors.orange,
+            ),
+            title: const Text('Add New Bin'),
+            onTap: () {
+              Navigator.pop(context); // Close the bottom sheet
+              debugPrint('Navigating to Bin Status from quick action');
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const BinStatusScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.report_problem_outlined,
+              color: Colors.red,
+            ),
+            title: const Text('Report Issue'),
+            onTap: () {
+              Navigator.pop(context); // Close the bottom sheet
+              debugPrint('Navigating to Report Issue from quick action');
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ReportIssueScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Logout'),
+            onTap: () {
+              Navigator.pop(context); // Close the bottom sheet
+              _signOut(); // Trigger logout
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 
   void _showImmediatePickupDialog() {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Request Immediate Pickup'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Select the bin for immediate pickup:'),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Bin ID',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    DropdownMenuItem(
-                      value: 'BIN-1001',
-                      child: Text('BIN-1001'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'BIN-1002',
-                      child: Text('BIN-1002'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'BIN-1003',
-                      child: Text('BIN-1003'),
-                    ),
-                  ],
-                  onChanged: (value) {},
+      builder: (context) => AlertDialog(
+        title: const Text('Request Immediate Pickup'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Select the bin for immediate pickup:'),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Bin ID',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: 'BIN-1001',
+                  child: Text('BIN-1001'),
                 ),
-                const SizedBox(height: 16),
-                const Text('Any special instructions?'),
-                const SizedBox(height: 8),
-                const TextField(
-                  decoration: InputDecoration(
-                    hintText: 'E.g., Pickup urgently before 5 PM',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
+                DropdownMenuItem(
+                  value: 'BIN-1002',
+                  child: Text('BIN-1002'),
+                ),
+                DropdownMenuItem(
+                  value: 'BIN-1003',
+                  child: Text('BIN-1003'),
                 ),
               ],
+              onChanged: (value) {},
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+            const SizedBox(height: 16),
+            const Text('Any special instructions?'),
+            const SizedBox(height: 8),
+            const TextField(
+              decoration: InputDecoration(
+                hintText: 'E.g., Pickup urgently before 5 PM',
+                border: OutlineInputBorder(),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Immediate pickup request submitted successfully',
-                      ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('Submit Request'),
-              ),
-            ],
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
           ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Immediate pickup request submitted successfully',
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Submit Request'),
+          ),
+        ],
+      ),
     );
   }
 

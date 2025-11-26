@@ -22,18 +22,17 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
   void _openQRScanner() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder:
-            (context) => QRScannerScreen(
-              onQRScanned: (String scannedCode) {
-                // Handle scanned QR code (e.g., show a dialog or update state)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Scanned QR: $scannedCode'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-            ),
+        builder: (context) => QRScannerScreen(
+          onQRScanned: (String scannedCode) {
+            // Handle scanned QR code (e.g., show a dialog or update state)
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Scanned QR: $scannedCode'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -46,90 +45,89 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Add New Bin'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Location',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: typeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Type',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: capacityController,
-                    decoration: const InputDecoration(
-                      labelText: 'Capacity (L)',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ],
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Bin'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: locationController,
+                decoration: const InputDecoration(
+                  labelText: 'Location',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: typeController,
+                decoration: const InputDecoration(
+                  labelText: 'Type',
+                  border: OutlineInputBorder(),
+                ),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  final location = locationController.text.trim();
-                  final type = typeController.text.trim();
-                  final capacity =
-                      double.tryParse(capacityController.text.trim()) ?? 0;
-
-                  if (location.isEmpty || type.isEmpty || capacity <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Please fill all fields with valid values',
-                        ),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-
-                  setState(() {
-                    _bins.add({
-                      'id':
-                          'BIN-${_homeNumber ?? 'UNKNOWN'}-${(_bins.length + 1).toString().padLeft(3, '0')}',
-                      'location': location,
-                      'type': type,
-                      'capacity': capacity,
-                      'fillLevel': 0.0,
-                      'lastEmptied': 'Never',
-                      'status': 'Normal',
-                    });
-                  });
-
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Bin added successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('Add Bin'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: capacityController,
+                decoration: const InputDecoration(
+                  labelText: 'Capacity (L)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
               ),
             ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final location = locationController.text.trim();
+              final type = typeController.text.trim();
+              final capacity =
+                  double.tryParse(capacityController.text.trim()) ?? 0;
+
+              if (location.isEmpty || type.isEmpty || capacity <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Please fill all fields with valid values',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              setState(() {
+                _bins.add({
+                  'id':
+                      'BIN-${_homeNumber ?? 'UNKNOWN'}-${(_bins.length + 1).toString().padLeft(3, '0')}',
+                  'location': location,
+                  'type': type,
+                  'capacity': capacity,
+                  'fillLevel': 0.0,
+                  'lastEmptied': 'Never',
+                  'status': 'Normal',
+                });
+              });
+
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Bin added successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Add Bin'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -140,25 +138,23 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors:
-              _autoRefreshTimer != null
-                  ? [
-                    const Color(0xFFE8F5E8), // Light green
-                    const Color(0xFFF0F9F0), // Very light green
-                  ]
-                  : [
-                    const Color(0xFFF5F5F5), // Light grey
-                    const Color(0xFFFAFAFA), // Very light grey
-                  ],
+          colors: _autoRefreshTimer != null
+              ? [
+                  const Color(0xFFE8F5E8), // Light green
+                  const Color(0xFFF0F9F0), // Very light green
+                ]
+              : [
+                  const Color(0xFFF5F5F5), // Light grey
+                  const Color(0xFFFAFAFA), // Very light grey
+                ],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color:
-              _autoRefreshTimer != null
-                  ? const Color(0xFF4CAF50).withOpacity(0.3)
-                  : Colors.grey.withOpacity(0.3),
+          color: _autoRefreshTimer != null
+              ? const Color(0xFF4CAF50).withOpacity(0.3)
+              : Colors.grey.withOpacity(0.3),
           width: 1.5,
         ),
         boxShadow: [
@@ -181,28 +177,26 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
                   .withOpacity(0.15),
               borderRadius: BorderRadius.circular(20),
             ),
-            child:
-                _isAutoRefreshing
-                    ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.green[600]!,
-                        ),
+            child: _isAutoRefreshing
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.green[600]!,
                       ),
-                    )
-                    : Icon(
-                      _autoRefreshTimer != null
-                          ? Icons.sync
-                          : Icons.sync_disabled,
-                      size: 16,
-                      color:
-                          _autoRefreshTimer != null
-                              ? Colors.green[600]
-                              : Colors.grey[600],
                     ),
+                  )
+                : Icon(
+                    _autoRefreshTimer != null
+                        ? Icons.sync
+                        : Icons.sync_disabled,
+                    size: 16,
+                    color: _autoRefreshTimer != null
+                        ? Colors.green[600]
+                        : Colors.grey[600],
+                  ),
           ),
 
           const SizedBox(width: 12),
@@ -219,10 +213,9 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color:
-                            _autoRefreshTimer != null
-                                ? Colors.green[700]
-                                : Colors.grey[700],
+                        color: _autoRefreshTimer != null
+                            ? Colors.green[700]
+                            : Colors.grey[700],
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -243,10 +236,9 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          color:
-                              _autoRefreshTimer != null
-                                  ? Colors.green[800]
-                                  : Colors.grey[600],
+                          color: _autoRefreshTimer != null
+                              ? Colors.green[800]
+                              : Colors.grey[600],
                         ),
                       ),
                     ),
@@ -309,180 +301,11 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
   String? _homeNumber;
   bool _isLoading = true;
   bool _isLoadingSmartBins = false;
-  List<Map<String, dynamic>> _notifications = [];
-  bool _hasUnreadNotifications = false;
 
   // Auto-refresh functionality
   Timer? _autoRefreshTimer;
   bool _isAutoRefreshing = false;
   DateTime? _lastRefreshTime;
-
-  void _showNotificationsDialog() {
-    // Filter notifications to show only Clea~Ro smart bin notifications (type == 'bin_full' and title contains 'Claro' or 'Smart Bin')
-    final smartBinNotifications =
-        _notifications.where((notif) {
-          final type = notif['type'] ?? '';
-          final title = (notif['title'] ?? '').toString().toLowerCase();
-          return type == 'bin_full' &&
-              (title.contains('claro') || title.contains('smart bin'));
-        }).toList();
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Notifications'),
-                if (_hasUnreadNotifications)
-                  TextButton(
-                    onPressed: () {
-                      NotificationService.markAllNotificationsAsRead();
-                    },
-                    child: const Text('Mark all read'),
-                  ),
-              ],
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 400,
-              child: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child:
-                        smartBinNotifications.isEmpty
-                            ? const Center(
-                              child: Text(
-                                'No Clea~Ro smart bin notifications',
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            )
-                            : ListView.builder(
-                              itemCount: smartBinNotifications.length,
-                              itemBuilder: (context, index) {
-                                final notification =
-                                    smartBinNotifications[index];
-                                final isRead = notification['isRead'] ?? false;
-                                final priority =
-                                    notification['priority'] ?? 'low';
-
-                                return Card(
-                                  color:
-                                      isRead
-                                          ? Colors.grey[50]
-                                          : Colors.blue[50],
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: _getPriorityColor(
-                                        priority,
-                                      ),
-                                      child: Icon(
-                                        _getNotificationIcon(
-                                          notification['type'],
-                                        ),
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    title: Text(
-                                      notification['title'] ?? 'Notification',
-                                      style: TextStyle(
-                                        fontWeight:
-                                            isRead
-                                                ? FontWeight.normal
-                                                : FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(notification['message'] ?? ''),
-                                        if (notification['createdAt'] != null)
-                                          Text(
-                                            _formatNotificationTime(
-                                              notification['createdAt'],
-                                            ),
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    onTap: () {
-                                      if (!isRead) {
-                                        NotificationService.markNotificationAsRead(
-                                          notification['id'],
-                                        );
-                                      }
-                                    },
-                                  ),
-                                );
-                              },
-                            ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  // Get priority color
-  Color _getPriorityColor(String priority) {
-    switch (priority) {
-      case 'high':
-        return Colors.red;
-      case 'medium':
-        return Colors.orange;
-      default:
-        return Colors.blue;
-    }
-  }
-
-  // Get notification icon
-  IconData _getNotificationIcon(String? type) {
-    switch (type) {
-      case 'bin_full':
-        return Icons.warning;
-      case 'emptying_request':
-        return Icons.check_circle;
-      case 'bin_request_status':
-        return Icons.assignment;
-      default:
-        return Icons.notifications;
-    }
-  }
-
-  // Format notification time
-  String _formatNotificationTime(dynamic timestamp) {
-    if (timestamp is Timestamp) {
-      final date = timestamp.toDate();
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inMinutes < 1) {
-        return 'Just now';
-      } else if (difference.inHours < 1) {
-        return '${difference.inMinutes}m ago';
-      } else if (difference.inDays < 1) {
-        return '${difference.inHours}h ago';
-      } else {
-        return '${difference.inDays}d ago';
-      }
-    }
-    return 'Unknown';
-  }
 
   @override
   void initState() {
@@ -491,7 +314,6 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
       _initializeExampleBins();
       _loadBins();
       _loadSmartBins();
-      _loadNotifications();
       _startBinMonitoring();
       _startAutoRefresh(); // Start auto-refresh timer
     });
@@ -595,11 +417,10 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        final userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
         if (userDoc.exists) {
           setState(() {
@@ -617,11 +438,10 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      final querySnapshot =
-          await FirebaseFirestore.instance
-              .collection('binRequests')
-              .where('userId', isEqualTo: user.uid)
-              .get();
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('binRequests')
+          .where('userId', isEqualTo: user.uid)
+          .get();
 
       setState(() {
         _pendingBins.clear();
@@ -668,45 +488,8 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
     }
   }
 
-  // Load user notifications
-  void _loadNotifications() {
-    NotificationService.getUserNotifications().listen((snapshot) {
-      if (mounted) {
-        setState(() {
-          // Fix: Ensure notifications are sorted by createdAt descending and handle missing fields
-          _notifications =
-              snapshot.docs.map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                // Defensive: Ensure createdAt is present and is a Timestamp
-                if (!data.containsKey('createdAt') ||
-                    !(data['createdAt'] is Timestamp)) {
-                  data['createdAt'] = Timestamp.now();
-                }
-                return {'id': doc.id, ...data};
-              }).toList();
-
-          // Sort notifications by createdAt descending (most recent first)
-          _notifications.sort((a, b) {
-            final ta = a['createdAt'] as Timestamp;
-            final tb = b['createdAt'] as Timestamp;
-            return tb.compareTo(ta);
-          });
-
-          _hasUnreadNotifications = _notifications.any(
-            (notif) => !(notif['isRead'] ?? false),
-          );
-        });
-      }
-    });
-  }
-
   // Start monitoring bins for full status
   void _startBinMonitoring() {
-    // Check smart bins every 30 seconds
-    Stream.periodic(Duration(seconds: 30)).listen((_) {
-      NotificationService.checkSmartBinStatus();
-    });
-
     // Auto-refresh smart bins data every 5 seconds to show real-time updates
     Stream.periodic(Duration(seconds: 5)).listen((_) {
       if (mounted) {
@@ -750,10 +533,9 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
               color:
                   _autoRefreshTimer != null ? Colors.green[600] : Colors.grey,
             ),
-            tooltip:
-                _autoRefreshTimer != null
-                    ? 'Auto-refresh ON'
-                    : 'Auto-refresh OFF',
+            tooltip: _autoRefreshTimer != null
+                ? 'Auto-refresh ON'
+                : 'Auto-refresh OFF',
             onPressed: () {
               if (_autoRefreshTimer != null) {
                 _stopAutoRefresh();
@@ -777,50 +559,11 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
               setState(() {});
             },
           ),
-          // Notification bell with badge
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications),
-                onPressed: _showNotificationsDialog,
-              ),
-              if (_hasUnreadNotifications)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Center(
-                      child: Text(
-                        _notifications
-                            .where((n) => !(n['isRead'] ?? false))
-                            .length
-                            .toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
         ],
       ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _buildOverviewTab(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildOverviewTab(),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           _showAddBinDialog();
@@ -987,8 +730,7 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
           getFirestoreValue(fillData?['fill_percentage'])?.toDouble() ?? 0.0;
       final isCritical = getFirestoreValue(fillData?['is_critical']) ?? false;
       final isFull = getFirestoreValue(fillData?['is_full']) ?? false;
-      final sensorWorking =
-          getFirestoreValue(
+      final sensorWorking = getFirestoreValue(
             getFirestoreValue(smartBin['system'])?['sensor_working'],
           ) ??
           false;
@@ -1353,17 +1095,15 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
                   Expanded(
                     flex: 3,
                     child: ElevatedButton.icon(
-                      onPressed:
-                          isOnline && sensorWorking
-                              ? () => _showSmartBinEmptyingDialog(smartBin)
-                              : null,
+                      onPressed: isOnline && sensorWorking
+                          ? () => _showSmartBinEmptyingDialog(smartBin)
+                          : null,
                       icon: const Icon(Icons.calendar_today, size: 18),
                       label: const Text('Request'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            isCritical || needsEmptying
-                                ? Colors.red
-                                : Colors.green,
+                        backgroundColor: isCritical || needsEmptying
+                            ? Colors.red
+                            : Colors.green,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
@@ -1425,77 +1165,76 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.smart_toy, color: Colors.blue[600]),
-                const SizedBox(width: 8),
-                const Text('Smart Bin Details'),
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.smart_toy, color: Colors.blue[600]),
+            const SizedBox(width: 8),
+            const Text('Smart Bin Details'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDetailItem('📍 Location', location),
+              _buildDetailItem('🆔 Bin ID', binId),
+              _buildDetailItem('📦 Type', smartBin['type'] ?? 'N/A'),
+              _buildDetailItem(
+                '📊 Fill Level',
+                '${(fillPercentage * 100).toInt()}%',
+              ),
+              _buildDetailItem(
+                '🗑️ Capacity',
+                '${smartBin['capacity'] ?? 'N/A'} liters',
+              ),
+              _buildDetailItem('🚨 Status', binStatus),
+              _buildDetailItem(
+                '🕐 Last Emptied',
+                smartBin['last_emptied'] != null
+                    ? (smartBin['last_emptied'] as Timestamp)
+                        .toDate()
+                        .toString()
+                        .substring(0, 10)
+                    : 'Never',
+              ),
+              const Divider(),
+              _buildDetailItem(
+                '📏 Bin Height',
+                '${binHeightCm.toStringAsFixed(1)} cm',
+              ),
+              _buildDetailItem(
+                '🗑️ Waste Height',
+                '${wasteHeightCm.toStringAsFixed(1)} cm',
+              ),
+              _buildDetailItem(
+                '📐 Distance',
+                '${distanceCm.toStringAsFixed(1)} cm',
+              ),
+              const Divider(),
+              _buildDetailItem('📱 Device', deviceType),
+              _buildDetailItem('💿 Firmware', firmwareVersion),
+              _buildDetailItem('📶 WiFi Signal', '$wifiSignal dBm'),
+              _buildDetailItem('🔌 Connection', connectionStatus),
+              if (hasGps) ...[
+                const Divider(),
+                _buildDetailItem('🛰️ GPS', 'Available'),
+                _buildDetailItem(
+                  '📍 Coordinates',
+                  '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
+                ),
               ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildDetailItem('📍 Location', location),
-                  _buildDetailItem('🆔 Bin ID', binId),
-                  _buildDetailItem('📦 Type', smartBin['type'] ?? 'N/A'),
-                  _buildDetailItem(
-                    '📊 Fill Level',
-                    '${(fillPercentage * 100).toInt()}%',
-                  ),
-                  _buildDetailItem(
-                    '🗑️ Capacity',
-                    '${smartBin['capacity'] ?? 'N/A'} liters',
-                  ),
-                  _buildDetailItem('🚨 Status', binStatus),
-                  _buildDetailItem(
-                    '🕐 Last Emptied',
-                    smartBin['last_emptied'] != null
-                        ? (smartBin['last_emptied'] as Timestamp)
-                            .toDate()
-                            .toString()
-                            .substring(0, 10)
-                        : 'Never',
-                  ),
-                  const Divider(),
-                  _buildDetailItem(
-                    '📏 Bin Height',
-                    '${binHeightCm.toStringAsFixed(1)} cm',
-                  ),
-                  _buildDetailItem(
-                    '🗑️ Waste Height',
-                    '${wasteHeightCm.toStringAsFixed(1)} cm',
-                  ),
-                  _buildDetailItem(
-                    '📐 Distance',
-                    '${distanceCm.toStringAsFixed(1)} cm',
-                  ),
-                  const Divider(),
-                  _buildDetailItem('📱 Device', deviceType),
-                  _buildDetailItem('💿 Firmware', firmwareVersion),
-                  _buildDetailItem('📶 WiFi Signal', '$wifiSignal dBm'),
-                  _buildDetailItem('🔌 Connection', connectionStatus),
-                  if (hasGps) ...[
-                    const Divider(),
-                    _buildDetailItem('🛰️ GPS', 'Available'),
-                    _buildDetailItem(
-                      '📍 Coordinates',
-                      '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
             ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1505,43 +1244,42 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Request Bin Emptying'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Bin: $location'),
-                Text('ID: $binId'),
-                const SizedBox(height: 16),
-                const Text(
-                  'Are you sure you want to request emptying for this smart bin?',
-                  style: TextStyle(fontSize: 14),
-                ),
-              ],
+      builder: (context) => AlertDialog(
+        title: const Text('Request Bin Emptying'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Bin: $location'),
+            Text('ID: $binId'),
+            const SizedBox(height: 16),
+            const Text(
+              'Are you sure you want to request emptying for this smart bin?',
+              style: TextStyle(fontSize: 14),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Emptying request submitted'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('Submit Request'),
-              ),
-            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
           ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Emptying request submitted'),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Submit Request'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2016,133 +1754,131 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
   void _showBinDetailsDialog(Map<String, dynamic> bin) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.delete_outline, color: Colors.grey[700]),
-                const SizedBox(width: 8),
-                const Text('Bin Details'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildDetailItem('📍 Location', bin['location'] ?? 'N/A'),
-                  _buildDetailItem('🆔 Bin ID', bin['id'] ?? 'N/A'),
-                  _buildDetailItem('📦 Type', bin['type'] ?? 'N/A'),
-                  _buildDetailItem(
-                    '📊 Fill Level',
-                    '${((bin['fillLevel'] ?? 0.0) * 100).toInt()}%',
-                  ),
-                  _buildDetailItem(
-                    '🗑️ Capacity',
-                    '${bin['capacity'] ?? 'N/A'} liters',
-                  ),
-                  _buildDetailItem('🚨 Status', bin['status'] ?? 'Unknown'),
-                  _buildDetailItem(
-                    '🕐 Last Emptied',
-                    bin['lastEmptied'] ?? 'Never',
-                  ),
-                ],
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.delete_outline, color: Colors.grey[700]),
+            const SizedBox(width: 8),
+            const Text('Bin Details'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDetailItem('📍 Location', bin['location'] ?? 'N/A'),
+              _buildDetailItem('🆔 Bin ID', bin['id'] ?? 'N/A'),
+              _buildDetailItem('📦 Type', bin['type'] ?? 'N/A'),
+              _buildDetailItem(
+                '📊 Fill Level',
+                '${((bin['fillLevel'] ?? 0.0) * 100).toInt()}%',
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+              _buildDetailItem(
+                '🗑️ Capacity',
+                '${bin['capacity'] ?? 'N/A'} liters',
               ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _showRequestEmptyingDialog(bin);
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('Request Emptying'),
+              _buildDetailItem('🚨 Status', bin['status'] ?? 'Unknown'),
+              _buildDetailItem(
+                '🕐 Last Emptied',
+                bin['lastEmptied'] ?? 'Never',
               ),
             ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showRequestEmptyingDialog(bin);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Request Emptying'),
+          ),
+        ],
+      ),
     );
   }
 
   void _showPendingBinDetailsDialog(Map<String, dynamic> bin) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.hourglass_empty, color: Colors.blue[700]),
-                const SizedBox(width: 8),
-                const Text('Pending Bin Request'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildDetailItem('📍 Location', bin['location'] ?? 'N/A'),
-                  _buildDetailItem('🆔 Request ID', bin['id'] ?? 'N/A'),
-                  _buildDetailItem('📦 Type', bin['type'] ?? 'N/A'),
-                  _buildDetailItem(
-                    '🗑️ Capacity',
-                    '${bin['capacity'] ?? 'N/A'} liters',
-                  ),
-                  _buildDetailItem('🚨 Status', 'Pending Approval'),
-                  _buildDetailItem(
-                    '📅 Requested On',
-                    bin['createdAt'] != null
-                        ? (bin['createdAt'] as Timestamp)
-                            .toDate()
-                            .toString()
-                            .substring(0, 10)
-                        : 'Unknown',
-                  ),
-                  _buildDetailItem(
-                    '📝 Reason',
-                    bin['reason'] ?? 'Not specified',
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: Colors.blue[700],
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Your request is being reviewed by the admin team.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.blue[900],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.hourglass_empty, color: Colors.blue[700]),
+            const SizedBox(width: 8),
+            const Text('Pending Bin Request'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDetailItem('📍 Location', bin['location'] ?? 'N/A'),
+              _buildDetailItem('🆔 Request ID', bin['id'] ?? 'N/A'),
+              _buildDetailItem('📦 Type', bin['type'] ?? 'N/A'),
+              _buildDetailItem(
+                '🗑️ Capacity',
+                '${bin['capacity'] ?? 'N/A'} liters',
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+              _buildDetailItem('🚨 Status', 'Pending Approval'),
+              _buildDetailItem(
+                '📅 Requested On',
+                bin['createdAt'] != null
+                    ? (bin['createdAt'] as Timestamp)
+                        .toDate()
+                        .toString()
+                        .substring(0, 10)
+                    : 'Unknown',
+              ),
+              _buildDetailItem(
+                '📝 Reason',
+                bin['reason'] ?? 'Not specified',
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.blue[700],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Your request is being reviewed by the admin team.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue[900],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2152,123 +1888,120 @@ class _BinStatusScreenState extends State<BinStatusScreen> {
 
     showDialog(
       context: context,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  title: const Text('Request Bin Emptying'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Bin: ${bin['location']}'),
-                      Text('ID: ${bin['id']}'),
-                      const SizedBox(height: 16),
-                      const Text('Select preferred date:'),
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () async {
-                          final pickedDate = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now().add(
-                              const Duration(days: 1),
-                            ),
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 14),
-                            ),
-                          );
-                          if (pickedDate != null) {
-                            setState(() {
-                              selectedDate = pickedDate;
-                            });
-                          }
-                        },
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'Preferred Date',
-                            border: OutlineInputBorder(),
-                            suffixIcon: Icon(Icons.calendar_today),
-                          ),
-                          child: Text(
-                            selectedDate != null
-                                ? '${selectedDate!.toLocal()}'.split(' ')[0]
-                                : 'Select Date',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Any special instructions?'),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: noteController,
-                        decoration: const InputDecoration(
-                          hintText: 'E.g., Please empty before 9 AM',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 2,
-                      ),
-                    ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Request Bin Emptying'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Bin: ${bin['location']}'),
+              Text('ID: ${bin['id']}'),
+              const SizedBox(height: 16),
+              const Text('Select preferred date:'),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now().add(
+                      const Duration(days: 1),
+                    ),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(
+                      const Duration(days: 14),
+                    ),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      selectedDate = pickedDate;
+                    });
+                  }
+                },
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Preferred Date',
+                    border: OutlineInputBorder(),
+                    suffixIcon: Icon(Icons.calendar_today),
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        if (selectedDate == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please select a date'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-
-                        try {
-                          final user = FirebaseAuth.instance.currentUser;
-                          if (user == null)
-                            throw Exception('User not logged in');
-
-                          await FirebaseFirestore.instance
-                              .collection('emptyingRequests')
-                              .add({
-                                'binId': bin['id'],
-                                'type': bin['type'],
-                                'date': selectedDate,
-                                'note': noteController.text.trim(),
-                                'userId': user.uid,
-                                'createdAt': FieldValue.serverTimestamp(),
-                              });
-
-                          Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Emptying request submitted successfully',
-                              ),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                      ),
-                      child: const Text('Submit Request'),
-                    ),
-                  ],
+                  child: Text(
+                    selectedDate != null
+                        ? '${selectedDate!.toLocal()}'.split(' ')[0]
+                        : 'Select Date',
+                  ),
                 ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Any special instructions?'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: noteController,
+                decoration: const InputDecoration(
+                  hintText: 'E.g., Please empty before 9 AM',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedDate == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please select a date'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null) throw Exception('User not logged in');
+
+                  await FirebaseFirestore.instance
+                      .collection('emptyingRequests')
+                      .add({
+                    'binId': bin['id'],
+                    'type': bin['type'],
+                    'date': selectedDate,
+                    'note': noteController.text.trim(),
+                    'userId': user.uid,
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Emptying request submitted successfully',
+                      ),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+              ),
+              child: const Text('Submit Request'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2288,17 +2021,15 @@ class _FillLevelPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paintOutline =
-        Paint()
-          ..color = Colors.grey.withOpacity(0.3)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 10.0;
+    final paintOutline = Paint()
+      ..color = Colors.grey.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10.0;
 
-    final paintFill =
-        Paint()
-          ..color = fillColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 10.0;
+    final paintFill = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10.0;
 
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 10;
@@ -2325,7 +2056,7 @@ class QRScannerScreen extends StatefulWidget {
   final Function(String) onQRScanned;
 
   const QRScannerScreen({Key? key, required this.onQRScanned})
-    : super(key: key);
+      : super(key: key);
 
   @override
   State<QRScannerScreen> createState() => _QRScannerScreenState();
