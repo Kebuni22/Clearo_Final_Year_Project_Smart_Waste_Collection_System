@@ -8,7 +8,7 @@
 
 // ==================== SMART BIN CONFIGURATION ====================
 // WiFi credentials
-const char* ssid = "Champi";
+const char* ssid = "vivoY15s";
 const char* password = "12345678";
 
 // Firestore settings
